@@ -1,0 +1,1120 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"EOF",
+				"NT_UPD_EOF"
+			],
+			[
+				"EVI",
+				"EVIL_TILE_ON_FLOOR"
+			],
+			[
+				"m113_co",
+				"m113_comm_pool_checksum_calculate"
+			],
+			[
+				"Famito",
+				"FamiToneSfxInit"
+			],
+			[
+				"COMM_",
+				"COMM_DIAMOND_A"
+			],
+			[
+				"my",
+				"mypal_game_cuts0"
+			],
+			[
+				"ENE",
+				"ENEMY_TYPE_FANTY"
+			],
+			[
+				"palcut",
+				"palcuts1"
+			],
+			[
+				"pal",
+				"pal_effect"
+			],
+			[
+				"PL",
+				"PLAYER_VY_JUMP_MAX"
+			],
+			[
+				"n",
+				"n_bolts"
+			],
+			[
+				"HO",
+				"HOTSPOT_TYPE_PLATFORMS"
+			],
+			[
+				"NAME",
+				"NAMETABLE_B"
+			],
+			[
+				"level_p",
+				"level_pal_fg"
+			],
+			[
+				"level_ts",
+				"level_ts_tmaps"
+			],
+			[
+				"NA",
+				"NAMETABLE_B"
+			],
+			[
+				"update_lis",
+				"update_list_tile"
+			],
+			[
+				"update",
+				"update_list"
+			],
+			[
+				"upda",
+				"update_index"
+			],
+			[
+				"gp",
+				"gp_addr"
+			],
+			[
+				"map_",
+				"map_buff"
+			],
+			[
+				"up",
+				"update_index"
+			],
+			[
+				"de",
+				"debug_print_hex_16_dl"
+			],
+			[
+				"clea",
+				"clear_update_list"
+			],
+			[
+				"EN",
+				"ENABLE_CONTAINERS"
+			],
+			[
+				"H",
+				"HOTSPOT_TYPE_STAR"
+			],
+			[
+				"Sprite",
+				"SpriteTable"
+			],
+			[
+				"TAR",
+				"TARGET_SG"
+			],
+			[
+				"ppode",
+				"ppodewwwr_on"
+			],
+			[
+				"ppu",
+				"ppu_waitnmi"
+			],
+			[
+				"fra",
+				"frame_counter"
+			],
+			[
+				"PLAYER_",
+				"PLAYER_GENITAL"
+			],
+			[
+				"PLAYER_HA",
+				"PLAYER_HAS_JUMP"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "tutorial.md",
+			"settings":
+			{
+				"buffer_size": 8338,
+				"encoding": "UTF-8",
+				"line_ending": "Windows",
+				"name": "Tutorial"
+			}
+		},
+		{
+			"contents": "'' VANE 0.2 by The Mojon Twins & Relevo\n\toption SEGACD PROGRAM\n\toption NOLOADFONT\n\n' Use this table to define the base cluster of each chapter in your game\nchaptersBaseClusters:\n\tData 9, 11\n\t\t\n' Memory map\n\n' &H214700 - 32K For tha sample pool\n' &H21C770 - 128K For the image pool\n' &H23C770 - 80 bytes For menu items\n' &H23C7C0 - 4K For scripts.\n' &H23D7C0 - 8K-128bytes For texts\n' &H23F7C0 - 256 bytes For text buffer.\n' &H23F840 - 32 bytes For current word buffer\n' &H23F860 - 1920 bytes For tilemap\n' &H23FFE0 - 32 bytes For palette\n\n' &HFFFFDC - Sample start\n' &HFFFFE0 - Sample end\n' &HFFFFE4 - chapter title\n' &HFFFFFD - Base cluster\n' &HFFFFFE - Is copied to flag #127, used for specialVal mode.\n' &HFFFFFF - Start from chapter ...\n\n'' Constants\n\n\tConst #CLUSTER_CHARSET = 6\n\tConst #CLUSTER_CHARSET_PAL = 7\n\tConst #CLUSTER_SAMPLES = 8\n\n\tConst #PT_IMG = &H21C770\n\tConst #PT_MEN = &H23C770\n\tConst #PT_SPT = &H23C7C0\n\tConst #PT_TXT = &H23D7C0\n\tConst #PT_TXB = &H23F740\n\tConst #PT_CWB = &H23F840\n\tConst #PT_TMB = &H23F860\n\tConst #PT_PLB = &H23FFE0\n\tConst #SP_BASE = &H214700\t\t' Sample pool base address\n\n\tConst #IMG_POOL_SIZE = 122880\t' 120K\n\tConst #SP_SIZE = 15\t\t\t\t' Sample pool size (minus one)\n\t\n\tConst #SYSFONTBASE = 0\n\tConst #IMGPOOLTSBASE = 192\n\t\n\tConst #TBTS = 25\t\t\t\t' Title Bar Text Size\n\n'' Globals\n\n\tGlobal topOfScreen As Integer\n\tGlobal titleBar As Integer\n\tGlobal windowHeight As Integer\n\tGlobal menuBottom As Integer\n\tGlobal menuLeft As Integer\n\n\tGlobal imgOffs&\tAs Long\t\t\t' Image offset in bytes inside cluster.\n\tGlobal nextImgOffs&\tAs Long\t\t' Same, For Next.\n\tGlobal gpP& As Long\t\t\t\t' General purpose pointer\n\tGlobal gpW& As Long\t\t\t\t' General purpose pointer #2\n\tGlobal sptP& As Long\t\t\t' Script pointer\n\tGlobal menuOpts As Integer\t\t' Number of menu options\n\tGlobal flags(127) As Integer\t' Flags For scripting control\n\tGlobal lastTile As Integer\n\tGlobal cutsPool(7, 1) As Integer ' 0->lastTile, 1->index\n\tGlobal cutsPoolIndex As Integer\n\tGlobal fancy As Integer\n\tGlobal rememberMenuOpt as Integer\n\t\n\tGlobal baseCluster as Integer\t' Base cluster For chapters.\n\tGlobal specialVal as Integer\n\tGlobal languageMod as Integer\t' Add to base cluster + 1 for correct script\n\t\n\tGlobal palYadjust As Integer\t' Will equal 1 If screen is pal\n\n\tGlobal scroll_pos As Integer\t' Current scroll position (pixel)\n\tGlobal scroll_pos_to As Integer\t' Scroll destination\n\tGlobal scroll_step As Integer\t' Scroll pixel step\n\tGlobal scroll_maxSubstep As Integer ' For < 1 pixel per frame scrolls\n\tGlobal scroll_subctr As Integer\n\t\n\tGlobal samplePool&(#SP_SIZE,1) As Long ' Sample pool 0->ini, 1->end\n\tGlobal sampleCur As Integer\t\t' Current sample\n\tGlobal sampleOffset& As Long\t' Last sample offset\n\t\n\tGlobal doNothing As Integer\t\t' If <> 0, does nothing but decrement this.\n\t\n\tGlobal vBlankIntSignal As Integer\n\t\t\n'' Each vBlank...\n\n\tOn VBLANK Gosub vBlank_controller\n\t\t\n'' Read from communication memory table\n\n\tchapterNumber = Peek(&HFFFF20)\n\tspecialVal = Peek(&HFFFF21)\n\tcommand = Peek(&HFFFF23)\n\tnextAddress = PeekInt(&HFFFF24)\n\tlanguageMod = Peek(&HFFFF26)\n\ttopOfScreen = Peek(&HFFFF27)\n\ttitleBar = Peek(&HFFFF28)\n\twindowHeight = Peek(&HFFFF29) - 1\t' URM!!!   <- Corregir esto\n\tmenuBottom = Peek(&HFFFF2A) + 1\t\t' AW 풵TF? <- Corregir esto\n\tmenuLeft = Peek(&HFFFF2B)\n\n'' Load Z80 sample player by Shiru\n\n\tDisable Screen\n\tCall shiruLoadZ80\n\tEnable Screen\n\t\t\n'' Load charset & set palette\n\n\tclearAll\n\tloadscd #CLUSTER_CHARSET, VRAM, 0, 192, #SYSFONTBASE\n\tloadscd #CLUSTER_CHARSET_PAL, POINTER, 0, 32, #PT_IMG\n\tFor i = 0 To 15\n\t\tPalette PeekInt(#PT_IMG + i + i), 1, i\n\tNext i\n\n'' Adjusto For PAL?\n\n\tIf TvType() = 0 Then\n\t\tpalYadjust = 0\n\tElse\n\t\tpalYadjust = 1\n\tEnd If\n\n'' title bar\n\t\n\tif (titleBar) = 1 Then\n\t\tSetGFXPlane SCROLL_A\n\t\n\t\tDrawTile #SYSFONTBASE + 32 + Pallette(1), 0, palYadjust\n\t\tgpP& = &HFFFEE7\n\t\tFor i = 1 To #TBTS\n\t\t\tDrawTile #SYSFONTBASE + Peek(gpP&) + Pallette(1), i, palYadjust\n\t\t\tgpP&=gpP& + 1\n\t\tNext i\n\t\tFor i = #TBTS + 1 To 39\n\t\t\tDrawTile #SYSFONTBASE + 32 + Pallette(1), i, palYadjust\n\t\tNext i\n\t\t\n\t\tIf specialVal = 1 Then\n\t\t\tDrawTile #SYSFONTBASE + 14 + Pallette(1), 35, palYadjust\n\t\t\tDrawTile #SYSFONTBASE + 15 + Pallette(1), 36, palYadjust\n\t\t\tDrawTile #SYSFONTBASE + 16 + Pallette(1), 37, palYadjust\n\t\t\tDrawTile #SYSFONTBASE + 17 + Pallette(1), 38, palYadjust\n\t\tEnd If\n\tEnd If\n\t\n'' Scroll set\n\n\tSetScrollMode HSCROLL_OVERALL, VSCROLL_OVERALL\n\tSetScrollPlane SCROLL_B\n\n'' main loop \n\n\tflags(127) = specialVal\n\t\n\trememberMenuOpt = 1\n\tDo\n\t\tchapter = chapterNumber\n\t\tfancy = 1\n\t\tDo\n\t\t\tnextChapter = runChapter(chapter)\n\t\t\tchapter = nextChapter\n\t\tLoop While chapter < &HFF\n\tLoop\n\n' You must define the chapter->base cluster equivalence in CHAPTERS.BEX\n' (which gets included at the end of this file)\nDeclare Function selectBaseCluster(chapter As Integer)\n\tReload chaptersBaseClusters\n\tFor i = 0 To chapter\n\t\tRead res\n\tNext i\n\tReturn res\nEnd Function\n\t\n' Runs a \"chapter\". A chapter is composed by two clusters, those of\n' numbers baseCluster + chapter * 2 and following.\n' First cluster contains the main script file plus texts\n' Second cluster contains images\nDeclare Function runChapter(chapter As Integer)\n\tchapterCluster = selectBaseCluster (chapter)\n\t\n\tmenuOpts = 0\n\tlastTile = 0\n\tcutsPoolIndex = 0\n\tnextChapter = 0\n\tdoNothing = 0\n\t\n\tshowLoading 1\t\n\t' First two bytes of the script cluster contains the length.\n\t' That way we don't waste time.\n\tloadscd chapterCluster + 1 + languageMod, ARRAY, 0, scriptLength\n\t\n\t' First of all, load script.\n\tloadscd chapterCluster + 1 + languageMod, POINTER, 2, scriptLength, #PT_SPT\n\tshowLoading 0\n\t\n\tshowLoading 1\n\t' Now find the length of text bit in chunk. Text will start\n\t' at scriptLength\n\tloadscd chapterCluster + 1 + languageMod, ARRAY, scriptLength, textChunkLength\n\n\t' And load up everything in our buffer\n\tloadscd chapterCluster + 1 + languageMod, POINTER, scriptLength + 2, textChunkLength, #PT_TXT\n\tshowLoading 0\n\t\n\t' Finally, preload all images.\n\tshowLoading 1\n\tloadscd chapterCluster, POINTER, 0, #IMG_POOL_SIZE, #PT_IMG\n\tshowLoading 0\n\t\n\t' Now on To the interpreter!\n\t\n\t' If command = 1 we must run from &HFFFF25-26 and clear command.\n\tIf command = 1 Then\n\t\tsptP& = #PT_SPT + PeekInt(&HFFFF25)\n\t\tcommand = 0\n\t\tPoke &HFFFF23, command\n\tElse\n\t\tsptP& = #PT_SPT\n\tEnd If\n\t\n\tscroll_pos = 0\n\tscroll_pos_to = 0\n\tscroll_step = 0\n\tallDone = 0\n\t\n\tvBlankIntSignal = 0\n\tEnable INTERRUPT VBLANK\n\t\n\tDo While allDone = 0\n\t\t' Listen for signals from the vBlank interrupt...\n\t\tIf vBlankIntSignal Then\n\t\t\tSelect Case vBlankIntSignal\n\t\t\t\tCase &H01:\n\t\t\t\t\t' Jump to subprogram upon button binding!\n\t\t\t\t\t\n\t\t\t\t\t' Save PC\n\t\t\t\t\tPokeInt &HFFFF25, getIntPart(sptP& - #PT_SPT)\n\t\t\t\t\t\n\t\t\t\t\t' &HFFFFFF has already been poked by the vBlank Interrupt Routine.\n\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\t' Forced exit\n\t\t\t\t\tnextChapter = &HFF\n\t\t\t\t\tallDone = 1\n\t\t\t\t\tExit Select\n\t\t\tEnd Select\n\t\t\tvBlankIntSignal = 0\n\t\tEnd If\n\t\n\t\tIf doNothing > 0 Then\n\t\t\tSleep 1\n\t\t\tdoNothing = doNothing - 1\n\t\tElse\n\t\t\tb = readByte ()\n\t\t\tSelect Case b\n\t\t\t\tCase &H01:\n\t\t\t\t\t' image\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\t'loadImage baseCluster + 1, b\n\t\t\t\t\tloadImageFromMem b, 0, 0, 0, 0, 0\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H02:\n\t\t\t\t\t' cut_load\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tc = readVByte ()\n\t\t\t\t\tloadImageFromMem c, 1, b, 0, 0, 0\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H03:\n\t\t\t\t\t' clear\n\t\t\t\t\tlastTile = 0\n\t\t\t\t\tcutsPoolIndex = 0\n\t\t\t\t\tSetGFXPlane SCROLL_B\n\t\t\t\t\tFor i = topOfScreen To 24\n\t\t\t\t\t\tFor j = 0 To 39\n\t\t\t\t\t\t\tDrawTile 0, j, i + palYadjust\n\t\t\t\t\t\tNext j\n\t\t\t\t\tNext i\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H04:\n\t\t\t\t\t' cut show\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tx = readVByte ()\n\t\t\t\t\ty = readVByte ()\n\t\t\t\t\tloadImageFromMem cutsPool(b, 1), 2, b, x, y, 0\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H05:\n\t\t\t\t\t' fancy on\n\t\t\t\t\tfancy = 1\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H06:\n\t\t\t\t\t' fancy off\n\t\t\t\t\tfancy = 0\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H07:\n\t\t\t\t\t' Scroll_BG\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tloadImageFromMem b, 3, 0, 0, 0\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H08:\n\t\t\t\t\t' Restore_BG\n\t\t\t\t\toldfancy = fancy\n\t\t\t\t\tfancy = 0\n\t\t\t\t\tloadImageFromMem cutsPool (0, 1), 2, 0, 0, 0, 0\n\t\t\t\t\tfancy = oldfancy\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H09:\n\t\t\t\t\t' cut ovl\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tx = readVByte ()\n\t\t\t\t\ty = readVByte ()\n\t\t\t\t\tloadImageFromMem cutsPool(b, 1), 2, b, x, y, 1\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H10:\n\t\t\t\tCase &H11:\n\t\t\t\t\t' text\n\t\t\t\t\tc = readVByte ()\n\t\t\t\t\tdoTextCycle c\n\t\t\t\t\tIf b = &H11 Then DoWt\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H1D:\n\t\t\t\t\t' Set sleep counter\n\t\t\t\t\tb = readByte ()\n\t\t\t\t\tdoNothing = b << 8\n\t\t\t\t\tdoNothing = doNothing + readByte ()\n\t\t\t\tCase &H1E:\n\t\t\t\t\t' clear text\n\t\t\t\t\tclrTextArea\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H1F:\n\t\t\t\t\t' wait\n\t\t\t\t\tdoWt\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H20:\n\t\t\t\t\t' Clear menu\n\t\t\t\t\tmenuOpts = 0\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H21:\n\t\t\t\tCase &H22:\n\t\t\t\tCase &H23:\n\t\t\t\t\tIf b = &H22 Then\n\t\t\t\t\t\twriteTo = readVByte () - 1\n\t\t\t\t\tElse\n\t\t\t\t\t\twriteTo = menuOpts\n\t\t\t\t\t\tIf b = &H23 Then flags(readVByte ()) = writeTo + 1\n\t\t\t\t\tEnd If\n\t\t\t\t\t' Add Item\n\t\t\t\t\t' Copy bytes To menu buffer\n\t\t\t\t\tIf menuOpts < 8 Then\n\t\t\t\t\t\tgpP& = #PT_MEN + (writeTo * 10)\n\t\t\t\t\t\tFor i = 0 To 9\n\t\t\t\t\t\t\tc = readByte ()\n\t\t\t\t\t\t\tPoke gpP&, c\n\t\t\t\t\t\t\tgpP& = gpP& + 1\n\t\t\t\t\t\tNext i\n\t\t\t\t\t\tIf writeTo >= menuOpts Then\n\t\t\t\t\t\t\tmenuOpts = writeTo + 1\n\t\t\t\t\t\tEnd If\n\t\t\t\t\tEnd If\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H30:\n\t\t\t\tCase &H31:\n\t\t\t\tCase &H32:\n\t\t\t\tCase &H33:\n\t\t\t\t\tc = readVByte ()\n\t\t\t\t\td = readVByte ()\n\t\t\t\t\taddress& = readAddress&()\n\t\t\t\t\tdoCondBranch b, c, d, address&\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H3F:\n\t\t\t\t\t' GOTO\n\t\t\t\t\tjumpToAddress readAddress&()\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H40:\n\t\t\t\t\t' LET\n\t\t\t\t\ta = readVByte ()\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tflags(a) = b\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H50:\n\t\t\t\t\t' Do menu\n\t\t\t\t\tflags(0) = doMenu ()\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H60:\n\t\t\t\t\t' Talk\n\t\t\t\t\tSetGFXPlane SCROLL_A\n\t\t\t\t\tDrawTile #SYSFONTBASE + 32 + Pallette(1), 0, 27 - 1 - windowHeight + palYadjust\n\t\t\t\t\tDrawTile #SYSFONTBASE + 03 + Pallette(1), 0, 27 - 2 - windowHeight + palYadjust\n\t\t\t\t\tFor i = 1 To 10\n\t\t\t\t\t\tb = readByte ()\n\t\t\t\t\t\tDrawTile #SYSFONTBASE + Pallette(1) + b, i, 27 - 1 - windowHeight + palYadjust\n\t\t\t\t\t\tDrawTile #SYSFONTBASE + 03 + Pallette(1), i, 27 - 2 - windowHeight + palYadjust\n\t\t\t\t\tNext i\n\t\t\t\t\tDrawTile #SYSFONTBASE + 03 + Pallette(1), 11, 27 - 2 - windowHeight + palYadjust\n\t\t\t\t\tDrawTile #SYSFONTBASE + 32 + Pallette(1), 11, 27 - 1 - windowHeight + palYadjust\n\t\t\t\t\tDrawTile #SYSFONTBASE + 11 + Pallette(1), 12, 27 - 2 - windowHeight + palYadjust\n\t\t\t\t\tDrawTile #SYSFONTBASE + 12 + Pallette(1), 12, 27 - 1 - windowHeight + palYadjust\n\t\t\t\t\tFor i = 13 To 39\n\t\t\t\t\t\tDrawTile Pallette(1) + #SYSFONTBASE + 03, i, 27 - 1 - windowHeight + palYadjust\n\t\t\t\t\tNext i\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H61:\n\t\t\t\t\t' Talk Off\n\t\t\t\t\t' Prepare some stuff\n\t\t\t\t\tSetGFXPlane SCROLL_A\n\t\t\t\t\tFor i = 0 To 39\n\t\t\t\t\t\tDrawTile 0, i, 27 - 2 - windowHeight\n\t\t\t\t\t\tDrawTile Pallette(1) + #SYSFONTBASE + 03, i, 27 - 1 - windowHeight + palYadjust\n\t\t\t\t\tNext i\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H70:\n\t\t\t\t\t' CD Play\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tCdplay2 b\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H71:\n\t\t\t\t\t' CD Stop\n\t\t\t\t\tCdstop\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H72:\n\t\t\t\t\t' CD Pause\n\t\t\t\t\tCdpause\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H73:\n\t\t\t\t\t' CD Unpause\n\t\t\t\t\tCdunpause\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H80:\n\t\t\t\t\t' CLR\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tniceCls b\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H88:\n\t\t\t\t\t' SCROLL_SET TILE_POS\n\t\t\t\t\tb = readByte ()\n\t\t\t\t\tscroll_pos = b << 3\n\t\t\t\t\tscroll_pos_to = scroll_pos\n\t\t\t\t\tscroll_step = 0\n\t\t\t\t\tscroll_subctr = 0\n\t\t\t\t\tScrollHTo scroll_pos\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H89:\n\t\t\t\t\t' SCROLL_TO LSB STEP\n\t\t\t\t\tb = readByte ()\n\t\t\t\t\tscroll_pos_to = b << 3\n\t\t\t\t\tb = readVbyte ()\n\t\t\t\t\tIf b <= 32 Then \n\t\t\t\t\t\tscroll_step = b\n\t\t\t\t\t\tscroll_maxSubstep = 0\n\t\t\t\t\tElse\n\t\t\t\t\t\tscroll_step = 1\n\t\t\t\t\t\tscroll_maxSubstep = b - 32\n\t\t\t\t\tEnd If\n\t\t\t\t\tscroll_subctr = 0\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H90:\n\t\t\t\t\t' INC\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tflags(b) = flags(b) + 1\n\t\t\t\t\tExit Select\n\t\t\t\tCase &H91:\n\t\t\t\t\t' DEC\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tflags(b) = flags(b) - 1\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HA0:\n\t\t\t\t\t' CLEAR_SAMPLES\n\t\t\t\t\tsampleCur = 0\n\t\t\t\t\tsampleOffset& = #SP_BASE\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HA1:\n\t\t\t\t\t' ADD_SAMPLE\n\t\t\t\t\tb = readVByte ()\n\t\t\t\t\tsampleAdd (b)\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HA2:\n\t\t\t\t\t' PLAY_SAMPLE\n\t\t\t\t\tb = readByte ()\n\t\t\t\t\tsampleStart& = samplePool& (b, 0)\n\t\t\t\t\tsampleEnd& = samplePool& (b, 1)\n\t\t\t\t\tsamplePlay sampleStart&, sampleEnd&\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HE0:\n\t\t\t\t\t' SET N=A\n\t\t\t\t\tb = readByte ()\n\t\t\t\t\tPoke &HFFFF00 + b, readByte ()\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HE1:\n\t\t\t\t\t' RUN_SLOT N\n\t\t\t\t\tb = readByte ()\n\t\t\t\t\t\n\t\t\t\t\t' First save current PC...\n\t\t\t\t\tPokeInt &HFFFF25, getIntPart(sptP& - #PT_SPT)\n\t\t\t\t\t\n\t\t\t\t\t' Jump to slot at &HFFFF00 + b\n\t\t\t\t\t' If slot is \"0\" (does not exist) it attempts to load the menu.\n\t\t\t\t\t' If menu does not exist, it will load VANE.SCD from chapter 0.\n\t\t\t\t\t\n\t\t\t\t\tb = Peek(&HFFFF00 + b)\n\t\t\t\t\t\t\t\t\t\t\n\t\t\t\t\tIf b <> 0 Then\n\t\t\t\t\t\tPoke &HFFFFFF, b\n\t\t\t\t\tElse\n\t\t\t\t\t\tIf Peek(&HFFFF00) <> 0 Then\n\t\t\t\t\t\t\tPoke &HFFFFFF, Peek(&HFFFF00)\n\t\t\t\t\t\tElse\n\t\t\t\t\t\t\tPoke &HFFFF20, 0\n\t\t\t\t\t\t\tPoke &HFFFFFF, Peek(&HFFFF01)\n\t\t\t\t\t\tEnd If\n\t\t\t\t\tEnd If\n\t\t\t\t\t\n\t\t\t\t\t' Forced exit\n\t\t\t\t\tnextChapter = &HFF\n\t\t\t\t\tallDone = 1\n\t\t\t\t\t\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HFB:\n\t\t\t\t\tnextChapter = readVByte ()\n\t\t\t\t\tallDone = 1\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HFC:\n\t\t\t\t\tnextChapter = chapter\n\t\t\t\t\tallDone = 1\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HFD:\n\t\t\t\t\tnextChapter = chapter - 1\n\t\t\t\t\tIf nextChapter < 0 Then nextChapter = 0\n\t\t\t\t\tallDone = 1\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HFE:\n\t\t\t\t\tnextChapter = chapter + 1\n\t\t\t\t\tallDone = 1\n\t\t\t\t\tExit Select\n\t\t\t\tCase &HFF:\n\t\t\t\t\tnextChapter = &HFF\n\t\t\t\t\tallDone = 1\n\t\t\t\t\tExit Select\n\t\t\tEnd Select\n\t\tEnd If\n\tLoop\n\tDisable INTERRUPT VBLANK\n\t\n\tReturn nextChapter\nEnd Function\n\n' Nice CLS collection.\nDeclare Sub niceCls(b As Integer)\n\tDisable INTERRUPT VBLANK\n\tSetGFXPlane SCROLL_B\n\tSelect Case b\n\t\tCase 0:\n\t\t\tFor i = 0 To 63\n\t\t\t\tFor j = topOfScreen To 24\n\t\t\t\t\tDrawTile 0, i, j + palYadjust\n\t\t\t\tNext j\n\t\t\t\tSleep 1\n\t\t\tNext i\n\t\t\tExit Select\n\tEnd Select\n\tscroll_pos = 0\n\tscroll_pos_to = 0\n\tScrollHTo 0\n\tEnable INTERRUPT VBLANK\nEnd Sub\n\n' Does conditional branching. Extend.\nDeclare Sub doCondBranch(b As Integer, c As Integer, d As Integer, address& As Long)\n\tSelect Case b\n\t\tCase &H30: \n\t\t\tIf c = d Then jumpToAddress address&\n\t\t\tExit Select\n\t\tCase &H31: \n\t\t\tIf c <> d Then jumpToAddress address&\n\t\t\tExit Select\n\t\tCase &H32: \n\t\t\tIf c < d Then jumpToAddress address&\n\t\t\tExit Select\n\t\tCase &H33: \n\t\t\tIf c > d Then jumpToAddress address&\n\t\t\tExit Select\n\tEnd Select\nEnd Sub\n\n' Performs a full text cycle. I'm odd\nDeclare Sub doTextCycle(b As Integer)\n\tclrTextArea\n\treadText b\n\tshowLowText\nEnd Sub\n\n' Helper For the parser. Performs jumps\nDeclare Function readAddress&() As Long\n\tb = readByte ()\n\taddress& = b << 8\n\taddress& = address& + readByte ()\n\tReturn address&\nEnd Function\n\nDeclare Sub jumpToAddress(address&)\n\tsptP& = #PT_SPT + address&\nEnd Sub\n\t\n' Helper For the parser. Read single bytes and advances pointer\nDeclare Function readByte()\n\tb = Peek(sptP&)\n\t\n\t' DEBUG\n\t' locate 0,0:ink 1:Print sptP&; \": \"; right$(hex$(b),2); \"   \"\n\t' WaitBtn\n\t\t\n\tsptP& = sptP& + 1\n\tReturn b\nEnd Function\n\n' Helper For the parser. Read byte and interprets a possible encoded flag\nDeclare Function readVByte()\n\tres = 0\n\tb = readByte ()\n\tIf b > 127 Then \n\t\tres = flags (b - 128)\n\tElse\n\t\tres = b\n\tEnd If\n\tReturn res\nEnd Function\n\n' Waits until no button is pressed\nDeclare Sub waitNB()\n\t'button = 1\n\t'While button = 1\n\t'\tbutton = 0\n\t'\tj = joypad()\n\t'\tIf j.4 [OR] j.5 [OR] j.6 Then button = 1\n\t'Wend\n\tDo\n\t\tj = joypad ();\n\t\tIf j = 0 Then Exit Do\n\tLoop\nEnd Sub\n\n' Displays a flashing \"press button\" nice icon\nDeclare Sub doWt()\n\tSetGFXPlane SCROLL_A\n\tfinished = 0\n\tflipflop = 0\n\tctFr = 0\n\t' Wait For button\n\tDo\n\t\t'' 38,27\n\t\tctFr = ctFr + 1\n\t\tIf ctFr = 8 Then\n\t\t\tctFr = 0\n\t\t\tflipflop = 1 - flipflop\n\t\tEnd If\n\t\tIf flipflop = 1 Then\n\t\t\tDrawTile #SYSFONTBASE + 32 + Pallette (1), 38, 27 + palYadjust\n\t\tElse\n\t\t\tDrawTile #SYSFONTBASE + 13 + Pallette (1), 38, 27 + palYadjust\n\t\tEnd If\n\t\tj = joyPad ()\n\t\t'If j.4 [OR] j.5 [OR] j.6 Then Exit Do\n\t\tIf j.6 Then Exit Do\n\t\tSleep 1\n\tLoop\n\t' Make sure it's off\n\tDrawTile #SYSFONTBASE + 32 + Pallette (1), 38, 27 + palYadjust\n\t' Wait For no button\n\twaitNB\nEnd Sub\n\n' Displays a menu with defined options (menuOpts)\nDeclare Function doMenu()\n\n\t' Show frame\n\tSetGFXPlane SCROLL_A\n\t' 21-menuOpts\n\ta = menuBottom - menuOpts\n\tDrawTile #SYSFONTBASE + 02 + Pallette (1), menuLeft, a + palYadjust\n\tFor i = menuLeft + 1 To menuLeft + 10\n\t\tDrawTile #SYSFONTBASE + 03 + Pallette (1), i, a + palYadjust\n\tNext i\n\tDrawTile #SYSFONTBASE + 04 + Palette (1), menuLeft + 11, a + palYadjust \n\tSleep 2\n\tFor j = a + 1 To menuBottom\n\t\tDrawTile #SYSFONTBASE + 05 + Pallette (1), menuLeft, j + palYadjust\n\t\tFor i = menuLeft + 1 To menuLeft + 10\n\t\t\tDrawTile #SYSFONTBASE + 32 + Pallette (1), i, j + palYadjust\n\t\tNext i\n\t\tDrawTile #SYSFONTBASE + 06 + Pallette (1), menuLeft + 11 ,j + palYadjust\n\t\tSleep 2\n\tNext j\n\tDrawTile #SYSFONTBASE + 07 + Pallette (1), menuLeft, menuBottom + 1 + palYadjust\n\tFor i = menuLeft + 1 To menuLeft + 10\n\t\tDrawTile #SYSFONTBASE + 08 + Pallette (1), i, menuBottom + 1 + palYadjust\n\tNext i\n\tDrawTile #SYSFONTBASE + 09 + Pallette (1), menuLeft + 11, menuBottom + 1 + palYadjust\n\tSleep 2\n\t\n\t'' DO\n\topt = rememberMenuOpt\n\tIf opt > menuOpts Then opt = menuOpts\n\t\n\tfinished = 0\n\tDo While finished = 0\n\t\t' Show\n\t\tgpP& = #PT_MEN\n\t\tFor j = 1 To menuOpts\n\t\t\tIf j = opt Then \n\t\t\t\tadd = 64\n\t\t\tElse\n\t\t\t\tadd = 0\n\t\t\tEnd If\n\t\t\tFor i = menuLeft + 1 To menuLeft + 10\n\t\t\t\ttilenum = Pallette (1) + #SYSFONTBASE + Peek (gpP&) + add\n\t\t\t\tDrawTile tilenum, i, a + j + palYadjust\n\t\t\t\tgpP& = gpP& + 1\n\t\t\tNext i\n\t\tNext j\n\t\t\n\t\t' Input\n\t\tDo\n\t\t\tj = joypad ();\n\t\t\tIf (j.0) Then \n\t\t\t\topt = opt - 1\n\t\t\t\tIf opt < 1 Then opt = menuOpts\n\t\t\t\tExit Do\n\t\t\tEnd If\n\t\t\tIf (j.1) Then \n\t\t\t\topt = opt + 1\n\t\t\t\tIf opt > menuOpts Then opt = 1\n\t\t\t\tExit Do\n\t\t\tEnd If\n\t\t\t'If j.5 [OR] j.6 [OR] j.7 Then \n\t\t\tIf j.6 Then\n\t\t\t\tfinished = 1\n\t\t\t\tExit Do\n\t\t\tEnd If\n\t\tLoop\n\t\tDo\n\t\t\tj = joypad ();\n\t\t\tIf j = 0 Then Exit Do\n\t\tLoop\n\tLoop\n\t''\n\t\n\t' Clear\n\tFor j = a To menuBottom + 1\n\t\tFor i = menuLeft To menuLeft + 11\n\t\t\tDrawTile 0, i, j + palYadjust\n\t\tNext i\n\tNext j\n\t\n\t' Wait until no button is pressed\n\twaitNB\n\t\n\trememberMenuOpt = opt\n\tReturn opt\nEnd Function\n\n' Waits btn\nDeclare Sub waitBtn()\n\tDo\n\t\tj = joypad();\n\t\t'If j.5 [OR] j.6 [OR] j.7 Then Exit Do\n\t\tIf j.6 Then Exit Do\n\tLoop\n\twaitNB\nEnd Sub\n\n' Shows CD \"loading\"\nDeclare Sub showLoading(isOn)\n\tYbase = 11 + palYadjust\n\tSetGFXPlane SCROLL_A\n\tIf isOn = 0 Then\n\t\tFor i = 0 To 3\n\t\t\tFor j = 0 To 3\n\t\t\t\tDrawTile 0, 18+i, Ybase+j\n\t\t\tNext j\n\t\tNext i\n\t\tsleep 2\n\tElse\n\t\tDrawTilesInc Pallette (1) + #SYSFONTBASE + 160, 18, Ybase, 4, 4\n\tEnd If\nEnd Sub\n\n' Clears lines 25, 26, 27\nDeclare Sub clrTextArea()\n\tSetGFXPlane SCROLL_A\n\tFor y = 27 - windowHeight To 27: For x = 0 To 39\n\t\tDrawTile Pallette (1) + #SYSFONTBASE + 64, x, y + palYadjust\n\tNext x: Next y\nEnd Sub\n\n' Shows some nice text. Word wrapping and stuff. Simple. Reads text\n' from a memory buffer To avoid stupid strings and be able To use\n' a memory pool To store stuff. Also because this way 1 char = 1 byte.\nDeclare Sub showLowText()\n\tgpP& = #PT_TXB\n\tgpW& = #PT_CWB: cwL = 0\n\tx = 1: y = 27 - windowHeight\n\tdsl = 1\n\t\n\tSetGFXPlane SCROLL_A\n\tDo\n\t\tc = Peek (gpP&): gpP& = gpP& + 1\n\t\tIf c = 0 Then Exit Do\n\t\tIf c = 32 Then\n\t\t\tIf cwL > 0 Then\n\t\t\t\tIf x + cwL >= 39 Then\n\t\t\t\t\tx = 1\n\t\t\t\t\ty = y + 1\n\t\t\t\tEnd If\n\t\t\t\tgpW& = #PT_CWB\n\t\t\t\tFor i = 1 To cwL\n\t\t\t\t\tc = Peek (gpW&)\n\t\t\t\t\tgpW& = gpW& + 1\n\t\t\t\t\ttnum = Pallette (1) + #SYSFONTBASE + c\n\t\t\t\t\tDrawTile tnum, x, y + palYadjust\n\t\t\t\t\tx = x + 1\n\t\t\t\t\tIf dSl Then\n\t\t\t\t\t\tFor wa = 0 To 4\n\t\t\t\t\t\t\tj = joypad();\n\t\t\t\t\t\t\t'If j.5 [OR] j.6 [OR] j.7 Then\n\t\t\t\t\t\t\tIf j.6 Then\n\t\t\t\t\t\t\t\tdSl = 0\n\t\t\t\t\t\t\t\tExit For\n\t\t\t\t\t\t\tEnd If\n\t\t\t\t\t\t\tSleep 1\n\t\t\t\t\t\tNext wa\n\t\t\t\t\tEnd If\n\t\t\t\tNext i\n\t\t\t\tx = x + 1\n\t\t\t\tgpW& = #PT_CWB: cwL = 0\n\t\t\tEnd If\n\t\tElse\n\t\t\tPoke gpW&, c\n\t\t\tIf cwL < 32 Then\n\t\t\t\tcwL = cwL + 1\n\t\t\t\tgpW& = gpW& + 1\n\t\t\tEnd If\n\t\tEnd If\n\tLoop\n\t\n\twaitNB\nEnd Sub\n\n' Loads text from cluster and stores in buffer\n'Declare Sub readText(cluster As Integer, index As Integer)'\n'\tshowLoading 1\n'\t' Read offset\n'\tloadscd cluster, ARRAY, index * 4, gpP&\n'\tloadscd cluster, ARRAY, (index + 1) * 4, gpW&\n'\n'\t' Read text\n'\tloadscd cluster, POINTER, gpP&, (gpW& - gpP&), #PT_TXB\n'\tshowLoading 0\n'End Sub\n\n' Loads text from text pool and stores in buffer\n' Why? Buffer->Buffer? Wasteful? Nope. Just thinking ahead.\n' Compression anybody? v2?\nDeclare Sub readText(index As Integer)\n\ttextOffset& = PeekInt(#PT_TXT + (index * 2))\n\t\n\ttP& = #PT_TXT + textOffset&\n\ttD& = #PT_TXB\n\tDo\n\t\tc = Peek(tP&)\n\t\ttP& = tP& + 1\n\t\tPoke tD&, c\n\t\ttD& = tD& + 1\n\t\tIf c = 0 Then \n\t\t\tExit Do\t' So 0 is also written.\n\t\tEnd If\n\tLoop\nEnd Sub\n\n' cut = 0 full screen\n' cut = 1 load new tiles only (cut)\n' cut = 2 display preloaded tiles (cut)\n' cut = 3 bigger than screen image\nDeclare Sub loadImageFromMem(index As Integer, cut As Integer, cindex As Integer, x As Integer, y As Integer, fore As Integer)\n\t' Get image address = offset + #PT_IMG\n\timgOffs& = #PT_IMG + PeekLong&(#PT_IMG + (index * 4))\n\tnextImgOffs& = #PT_IMG + PeekLong&(#PT_IMG + ((index + 1) * 4))\n\t\n\t' Read palette and set\n\tp& = imgOffs&\n\tFor i = 0 To 15\n\t\tcol = peekInt(p&):\tp& = p& + 2: palette col, 0, i\n\tNext i\n\t\n\t' Read flag int\n\tflag = peekInt(p&)\n\t\n\t' Reset tile counter? only If flag = 0 (full screen)\n\t'If flag = 0 Then \n\t'\tlastTile = 0: cutsPoolIndex = 0: cindex = 0\n\t'\tw = 40: h = 24\n\t'Else\n\t'\tw = flag >> 8: h = flag % 256\n\t'\t' Bigger than screen image have flag != 0, so\n\t'\tIf cut = 3 Then\n\t'\t\tlastTile = 0: cutsPoolIndex = 0: cindex = 0\n\t'\tEnd If\n\t'End If\n\t' Better...\n\tIf cut = 0 [OR] cut = 3 Then\n\t\tlastTile = 0: cutsPoolIndex = 0: cindex = 0\n\tEnd If\n\tw = flag >> 8: If w = 0 Then w = 40\n\th = flag % 256: If h = 0 Then h = 24\n\t\n\t' Loading new tiles? Add To pool (To reuse later)\n\tIf cut != 2 Then\n\t\tcutsPool(cindex, 0) = lastTile\n\t\tcutsPool(cindex, 1) = index\n\t\t\n\t\tIf flag = 0 [OR] cut = 3 Then showLoading 1\n\t\t\n\t\t' Read tileset\n\t\t' Find how many words To write To VRAM.\n\t\tnbytes& = nextImgOffs& - imgOffs& - (w*h*2 + 32 + 2)\n\t\tnwords& = nbytes& / 2\n\t\tntiles = getIntPart(nbytes& / 32)\n\t\tp& = (w*h*2 + 32 + 2) + imgOffs&\n\t\ta& = (#IMGPOOLTSBASE + lastTile) * 32\n\t\tb& = a& + nwords& - 2\n\t\tFor i& = a& To b& Step 2\n\t\t\tVdpRamWrite i&, peekInt (p&): p& = p& + 2\n\t\tNext i&\n\t\t\n\t\tIf flag = 0 [OR] cut = 3 Then showLoading 0\n\tEnd If\n\t\n\t' Read tilemap and show\n\tIf cut != 1 Then\n\t\tIf fore = 1 Then \n\t\t\tSetGfxPlane SCROLL_A \n\t\tElse\n\t\t\tSetGfxPlane SCROLL_B\n\t\tEnd If\n\t\tp& = imgOffs& + 34\n\t\t'If flag != 0 [OR] fancy = 0 Then\n\t\tIf fancy = 0 Then\n\t\t\tDrawTiles16 p&, x, y + topOfScreen + palYadjust, w, h, #IMGPOOLTSBASE + cutsPool(cindex, 0)\n\t\tElse\n\t\t\ttileBase = #IMGPOOLTSBASE + cutsPool(cindex, 0)\n\t\t\tFor i = 0 To w - 1\n\t\t\t\tFor j = 0 To h - 1\n\t\t\t\t\tDrawTile tileBase + PeekInt(p& + i + i + (j * (w + w))), x + i, y + j + topOfScreen + palYadjust\n\t\t\t\tNext j\n\t\t\t\tsleep 1\n\t\t\tNext i\n\t\tEnd If\n\tEnd If\n\t\n\t' Update lastTile\n\tIf cut != 2 Then\n\t\tlastTile = lastTile + ntiles\n\tEnd If\nEnd Sub\n\n' Oh my gosh - BasiEgaXorz doesn't have any type conversion\n' that I know of - and type promotion is just lame. I have\n' To do this DIRTY trick To extract the INT part of a LONG...\n' As you can't assign a long To an integer... Which is lame.\nDeclare Function getIntPart(v& As Long) As Integer\n\t' Use #PT_CWB As a temporary scratchpad\n\tPokeLong #PT_CWB, v&\n\t' The int part is 2 bytes ahead\n\tReturn PeekInt(#PT_CWB + 2)\nEnd Function\n\n' Clears everything\nDeclare Sub clearAll()\n\tFor i = 0 To 25\n\t\tFor j = 0 To 63\n\t\t\tSetGfxPlane SCROLL_A\n\t\t\tDrawTile 0, j, i\n\t\t\tSetGfxPlane SCROLL_B\n\t\t\tDrawTile 0, j, i\n\t\tNext j\n\tNext i\nEnd Sub\n\n' Loads an image from our indexed cluster.\n' Memory map:\n'Declare Sub loadImage(cluster As Integer, index As Integer)\n'\tshowLoading 1\n'\t' Read offset\n'\tloadscd cluster, ARRAY, index * 4, imgOffs&\n'\tloadscd cluster, ARRAY, (index + 1) * 4, nextImgOffs&\n'\tshowLoading 0\n'\t\n'\t' Read palette\n'\tshowLoading 1\n'\tloadscd cluster, POINTER, imgOffs&, 32, #PT_PLB\n'\tshowLoading 0\n'\t\n'\t' Read flag int\n'\tshowLoading 1\n'\tloadscd cluster, ARRAY, imgOffs& + 32, imgFlag\n'\tshowLoading 0\n'\t\n'\t' Read tileset\n'\tnbytes& = nextImgOffs& - imgOffs& - 1954\n'\tntiles& = nbytes& / 32\n'\tshowLoading 1\n'\tloadscd cluster, VRAM, imgOffs& + 1954, ntiles&, 128\n'\tshowLoading 0\n'\t\n'\t' Read tilemap\n'\tshowLoading 1\n'\tloadscd cluster, POINTER, imgOffs& + 34, 1920, #PT_TMB\n'\tshowLoading 0\n'\t\n'\tshowLoading 1\n'\t' Activate palette\n'\tp& = #PT_PLB\n'\tFor i = 0 To 15\n'\t\tcol = peekInt (p&):\tp& = p& + 2\n'\t\tpalette col, 0, i\n'\tNext i\n'\t\n'\t' Show tilemap\n'\tSetGFXPlane SCROLL_B\n'\tDrawTiles16 #PT_TMB, 0, 1, 40, 24, 128\n'\t\n'\tshowLoading 0\n'End Sub\n\t\t\n' Code by Mairtruss\n' drawtiles16 lblptr&(<TileMap>),<X Pos>,<Y Pos>,<Width>,<Height>,<Adder>\t\nDeclare Asm Sub DrawTiles16(d5.l, d0.w, d1.w, d2.w, d3.w, d4.w)\n\tmovea.l\td5,a0\n\tsubq.b\t#1,d2\n\tsubq.b\t#1,d3\n\tmove.w\t#$2700,sr\n\tand.l\t#63,d0\n\tand.l\t#63,d1\n\tand.l\t#511,d2\n\tand.l\t#511,d3\n\tlsl.w\t#6,d1\n\tadd.w\td1,d0\n\tmove.w\td2,d1\n\tlsl.l\t#3,d0\n\tlsr.w\t#2,d0\n\tswap\td0\n\tadd.l\t(GFX_PLANE),d0\n\tmove.w\t#$8F02,4(a4)\n@1:\n\tmove.l\td0,4(a4)\n@2:\n\tmove.w\t(a0)+,d7\n\tadd.w\td4,d7\n\tmove.w\td7,(a4)\n\tdbf\td2,@2\n\tadd.l\t#$800000,d0\n\tmove.w\td1,d2\n\tdbf\td3,@1\n\tmove.w\t#$2000,sr\nEnd Sub\t\n\n' Scroll2 is broken so I wrote this\n' Scrolls SCROLL_B plane, of course.\nDeclare Sub ScrollHTo(x As Integer)\n\tVdpRamWrite &HA802, 512 - x\nEnd Sub\n\n'' SFX engine\n\n' Fetches sample #ns from #CLUSTER_SAMPLES\n' copies it into sample pool, updates everything and stuff\nDeclare Sub sampleAdd(ns As Integer)\n\tshowLoading 1\n\t\n\t' Read offset from cluster\n\tloadscd #CLUSTER_SAMPLES, ARRAY, ns * 4, smpOffs&\n\tloadscd #CLUSTER_SAMPLES, ARRAY, (ns + 1) * 4, nextSmpOffs&\n\tsSize& = nextSmpOffs& - smpOffs&\n\n\t' Read sample to MCD RAM\n\t' Can be done directly? If not, shit, I have to allocate some space\n\t' at the end of the IMG pool then move.\n\tsamplePool&(sampleCur, 0) = sampleOffset&\n\tloadscd #CLUSTER_SAMPLES, POINTER, smpOffs&, sSize&, sampleOffset&\n\t\n\t' Update pool\n\tsampleOffset& = sampleOffset& + sSize&\n\t' Samples are always 256 - aligned.\n\tsamplePool&(sampleCur, 1) = sampleOffset&\n\t\n\tshowLoading 0\n\t\n\tsampleCur = sampleCur + 1\nEnd Sub\n\n'Declare Sub samplePlay(sFrom&, sTo&)\n'\tPokeLong &HFFFFDC, sFrom&\n'\tPokeLong &HFFFFE0, sTo&\n'\tcall PlaySample\n'End Sub\nDeclare Asm Sub samplePlay(d0.l, d1.l)\n\t; This routine needs SAMPLE START @ d0, SAMPLE END @ d1\n    sub.l d0,d1\nwaitPlayer:\n    move.w  #$100,$a11100\t;busreq on\n    lea $a01ff0,a0\n    move.b (a0),d2\n    move.w  #$0,$a11100\t\t;busreq off\nwaitEnd:\n    move.w  #$100,$a11100\t;busreq on\n    lea $a01ff1,a0\t\t\t;store sample parameters in main RAM\n    lsr.l #8,d0\n    move.l d0,d2\n    lsr.l #7,d2\n    move.b d2,(a0)+\t\t\t;bank number\n    or.l #$80,d0\n    move.b d0,(a0)+\t\t\t;bank offset (msb)\n    lsr.l #8,d1\n    move.b d1,(a0)+\t\t\t;sample length (lsb)\n    lsr.l #8,d1\n    move.b d1,(a0)+\t\t\t;sample length (msb)\n    lea $a01ff0,a0\t\t\t;set 'new sample' flag\n    move.b #$ff,d0\n    move.b d0,(a0)+\n    move.w  #$0,$a11100\t\t;busreq off    \n\trts\nEnd Sub\n\n'' EOSFX engine\n\n' Stuff to perform each VBLANK.\n' For example: scrolling.\nvBlank_controller:\n\n\t' Scrolling controller\n\tscroll_subctr = scroll_subctr + 1\n\tIf scroll_maxSubstep = 0 [OR] scroll_subctr >= scroll_maxSubstep Then\n\t\t\tscroll_subctr = 0\n\t\tIf scroll_pos_to = scroll_pos Then \n\t\t\tflags(126) = scroll_pos >> 3\n\t\tElseIf scroll_pos_to > scroll_pos Then\n\t\t\tscroll_pos = scroll_pos + scroll_step\t\t\n\t\t\tflags(126) = scroll_pos >> 3\n\t\tElse\n\t\t\tscroll_pos = scroll_pos - scroll_step\n\t\t\t' Cheesy, yet works...\n\t\t\tflags(126) = (scroll_pos + 7) >> 3\n\t\tEnd If\n\t\tScrollHTo scroll_pos\n\tEnd If\t\t\n\t\n\t' Button bindings\n\tj = joypad();\n\t\n\t' B Button\n\tIf j.4 Then\n\t\tIf Peek(&HFFFF2C) Then\n\t\t\tPoke &HFFFFFF, Peek(&HFFFF2C)\n\t\t\tvBlankIntSignal = 1\n\t\tEnd If\n\tEnd If\n\t\n\t' C Button\n\tIf j.5 Then\n\t\tIf Peek(&HFFFF2D) Then\n\t\t\tPoke &HFFFFFF, Peek(&HFFFF2C)\n\t\t\tvBlankIntSignal = 1\n\t\tEnd If\n\tEnd If\n\t\n\t' START Button\n\tIf j.7 Then\n\t\tIf Peek(&HFFFF2E) Then\n\t\t\tPoke &HFFFFFF, Peek(&HFFFF2C)\n\t\t\tvBlankIntSignal = 1\n\t\tEnd If\n\tEnd If\n\t\n\tReturn\n\n'' There's stuff by shiru in every game I make.\n\n\tasm\n\t\nshiruLoadZ80:\t\t\n    move.w  #$100,$a11100\t\t;busreq on\n    move.w  #$100,$a11200\t\t;reset off\n\n    lea     $000000,a0\n    lea     $a00000,a1\n    move.l  #8192,d0\ncopyLoop0:\n    move.b  (a0)+,(a1)+\n    subq.w  #1,d0\n    bne     copyLoop0\n    \n    lea     DriverZ80,a0 \t\t;copy Z80 driver to Z80 RAM\n    lea     $a00000,a1\n    move.l  #DriverZ80end,d0\n    move.l  #DriverZ80,d1\n    sub.l   d1,d0\ncopyLoop:\n    move.b  (a0)+,(a1)+\n    subq.w  #1,d0\n    bne     copyLoop\n\n\tmove.l  #SoundEmpty,d0\t\t\n    lea     $a01ff0,a0\n    lsr.l   #8,d0\n    move.l  d0,d1\n    lsr.l   #7,d1\n    move.b  d1,(a0)+ \t\t\t;bank number\n    or.l    #$80,d0\n    move.b  d0,(a0)+\t\t\t;bank offset (msb)\n\n    move.w  #$0,$a11200\t\t\t;reset on\n    move.w  #$0,$a11100\t\t\t;busreq off\n    move.w  #$100,$a11200\t\t;reset off\n\trts\n\n    Align 256\t\t\t\t\t;samples must be 256-byte aligned!\n\nSoundEmpty:\n    incbin \"shirusfx\\blank.raw\"\t;empty buffer for silence channels\n\t\nDriverZ80:\n\talign 2\n    incbin \"shirusfx\\driver.bin\"\n    align 2\nDriverZ80end:\n\n\tend asm\n\t\n' Y si eso, ya.\n",
+			"file": "src/vane.bex",
+			"file_size": 30115,
+			"file_write_time": 131558409908670349,
+			"settings":
+			{
+				"buffer_size": 28868,
+				"encoding": "Western (Windows 1252)",
+				"line_ending": "Windows",
+				"scratch": true
+			}
+		},
+		{
+			"file": "src/script/sp01c.spt",
+			"settings":
+			{
+				"buffer_size": 498,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "src/script/sp00c.spt",
+			"settings":
+			{
+				"buffer_size": 402,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "scripting.md",
+			"settings":
+			{
+				"buffer_size": 9517,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "readme.md",
+			"settings":
+			{
+				"buffer_size": 15719,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "src/menu.bex",
+			"settings":
+			{
+				"buffer_size": 1610,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "/D/Google Drive/Maritrini/dev/genesis/EspTie/gen/script/sp08.spt",
+			"settings":
+			{
+				"buffer_size": 10594,
+				"encoding": "Western (Windows 1252)",
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "src/main.bex",
+			"settings":
+			{
+				"buffer_size": 1025,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"contents": "# STARTUP SCRIPT\n# Este es el script principal. Muestra \"LOKOSOFT\", las pantallas de t韙ulo,\n# alg鷑 que otro texto, y salta al siguiente chapter.\n\n\tCLEAR_SAMPLES\n\tADD_SAMPLE 0\n\tADD_SAMPLE 1\n\n\tCDPLAY 2\n\t\n\tFANCY ON\n\tCLEARTEXT\n\tTALK OFF\n\t\n\tIMAGE 0\n\tTEXT \"LOKO SOFT AP 1994, 2013, 2015 PRESENTA...\", WT\n\tPLAY_SAMPLE 0\n\tCLEARTEXT\n\tCLS\n\t\n\tIMAGE 1\n\tTEXT \"UNA NUEVA AVENTURA DE LA SAGA MTTDXS\", WT\n\tCLS\n\t\n\tIMAGE 2\n\tTEXT \"ESPACIO - TIEMPO, PROTAGONIZADA POR MAYKK Y XINKSS, AGENTES ESPECIALES GENIALES DE LA ORGANIZACION MTTDXS\", WT\n\tCLEARTEXT\n\tCLS\n\n# Siguiente script\n\n\tCHAPTER NEXT\n",
+			"file": "/D/Google Drive/Maritrini/dev/genesis/EspTie/gen/script/sp00.spt",
+			"file_size": 608,
+			"file_write_time": 130733923320000000,
+			"settings":
+			{
+				"buffer_size": 574,
+				"encoding": "Western (Windows 1252)",
+				"line_ending": "Windows",
+				"scratch": true
+			}
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 0.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/D/git/VANE",
+		"/D/git/VANE/src",
+		"/D/git/VANE/src/script",
+		"/D/git/VANE/util"
+	],
+	"file_history":
+	[
+		"/D/git/VANE/scripting.md",
+		"/D/git/VANE/readme.md",
+		"/D/git/VANE/memory_map.md",
+		"/D/Google Drive/Maritrini/dev/genesis/EspTie/gen/script/sp08.spt",
+		"/D/git/VANE/util/gmgsc.bas",
+		"/D/git/VANE/src/vane.bex",
+		"/D/git/VANE/src/menu.bex",
+		"/D/git/VANE/src/main.bex",
+		"/D/git/VANE/src/memory_map.md",
+		"/D/git/Gran_Sabiduria_v2/diario.md",
+		"/D/git/Gran_Sabiduria_v2/README.md",
+		"/D/git/Gran_Sabiduria_v2/the nine/dev/engine/screens.h",
+		"/D/git/Gran_Sabiduria_v2/makerom.bat",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/Menu/dev/engine/game.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/Monono/dev/engine/game.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/Monono/dev/game.s",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/pantanow/dev/engine/game.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/the nine/dev/engine/game.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/engine/game.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/ZCP/dev/engine/game.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/Bosque/dev/engine/game.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/ZCP/dev/engine/enems.h",
+		"/D/git/NES/multicart/src/Menu/dev/assets/menudata.h",
+		"/D/git/NES/multicart/src/Monono/dev/engine/game.h",
+		"/D/git/NES/multicart/src/Monono/dev/engine/bolts.h",
+		"/D/git/NES/multicart/src/Monono/dev/engine/printer.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/assets/levelset.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/engine/hotspots.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/engine/screens.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/engine/player.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/work/mkbins.bat",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/game.c",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/engine/hud.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/assets/metasprites.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/gfx/son_ss.png",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/gfx/cut_sprites.spt",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/assets/spritedata.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/definitions.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/engine/enems.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/someprotos.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/assets/precalcs.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/compile.bat",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal orig fixed/dev/engine/screens.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/ogt/makemusic.bat",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/gfx/cut_tiles.spt",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/assets/palettes.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/engine/printer.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal orig fixed/dev/assets/levelset.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/engine/puas.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/ram/bss.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal/dev/ram/zp.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/diario.txt",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/SonicMal orig fixed/dev/ram/bss.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/ZCP/dev/engine/mapper113.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/ZCP/dev/engine/mapper11.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/ZCP/dev/game.c",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/tontis/dev/ram/bss.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/tontis/dev/engine/game.h",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/tontis/dev/game.c",
+		"/C/Users/na_th/Desktop/git/nes_work/multicart/src/tontis/dev/engine/screens.h",
+		"/D/git/NES/multicart/src/diario.txt",
+		"/D/git/NES/multicart/src/README.md",
+		"/D/git/NES/multicart/src/Menu/gfx/cut_sprites.spt",
+		"/E/git/nes_work/multicart/src/Menu/dev/menustuff.h",
+		"/D/git/NES/multicart/src/Menu/dev/menustuff.h",
+		"/D/git/NES/multicart/src/ZCP/dev/game.c",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/src/Menu/gfx/cut_sprites.spt",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/Menu/dev/assets/menudata.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/pantanow/dev/game.c",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/the nine/dev/engine/player.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/the nine/dev/assets/precalcs.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/tontis/dev/engine/screens.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/diario.txt",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/tontis/dev/ram/zp.h",
+		"/C/Users/na_th_an/AppData/Local/Temp/Temp1_macos.zip/ReadmeMacOS.TXT",
+		"/C/Users/na_th_an/AppData/Local/Temp/Temp1_dpcmletterbox.zip/README.txt",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/SonicMal/dev/engine/screens.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/ZCP/dev/assets/zcp_qr.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/ZCP/dev/engine/printer.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/ZCP/dev/engine/screens.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/src/Menu/dev/engine/game.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/assets/strips.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/assets/menudata.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/assets/enems.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/engine/enems.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/engine/bullets.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/gfx/cut_tiles2.spt",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/compile.bat",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/assets/levels.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/game.c",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/assets/palettes.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/engine/game.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/assets/behs.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/tontis/dev/engine/screens.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/engine/player.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/gfx/cut_tiles2.spt",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/engine/screens.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/game.c",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/engine/game.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/assets/vv_qr_rle.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/gfx/vv_qr_rle.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/assets/tiledata2.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/gfx/cut_sprites.spt",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/engine/hud.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/assets/spritedata.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/testing.txt",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/assets/texts.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/engine/special.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/assets/text_scripts.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/ram/zp.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/engine/printer.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/assets/precalcs.h",
+		"/D/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/engine/game.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/labels.txt",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/ram/bss.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/engine/enems.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/MSDOS/Progr/QB1AGL0/gfx/convertall.bat",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/MSDOS/Progr/QB1AGL0/util/QB1AGL0imgcnv_all.bas",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/Bosque/dev/engine/hud.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/MSDOS/Progr/QB1AGL0/util/QB1AGL0pal.bas",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/pantanow/dev/game.c",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/engine/enems.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/engine/enemmods/enem_linear.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/engine/hud.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/SonicMal/dev/assets/metasprites.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/assets/metasprites.h",
+		"/C/Users/na_th_an/Google Drive/Maritrini/dev/NES/multicart/Menu/dev/game.c",
+		"/D/mp3/Scumm Classic/The Súpermix - Golden Greatest Hits (Jul-1994)/Golden Greatest Hits (1994).txt"
+	],
+	"find":
+	{
+		"height": 40.0
+	},
+	"find_in_files":
+	{
+		"height": 108.0,
+		"where_history":
+		[
+			"D:\\git\\Gran_Sabiduria_v2",
+			"C:\\Users\\na_th\\Desktop\\git\\nes_work\\multicart\\src\\",
+			"C:\\Users\\na_th\\Desktop\\git\\nes_work\\multicart\\src\\Bosque",
+			"C:\\Users\\na_th\\Desktop\\git\\nes_work\\multicart\\src",
+			"C:\\Users\\na_th\\Desktop\\git\\nes_work\\multicart\\src\\SonicMal\\dev\\engine",
+			"C:\\Users\\na_th\\Desktop\\git\\nes_work\\multicart\\src\\SonicMal\\dev",
+			"C:\\Users\\na_th\\Desktop\\git\\nes_work\\multicart\\src\\SonicMal",
+			"C:\\Users\\na_th\\Desktop\\git\\nes_work\\multicart\\src\\SonicMal\\dev\\engine",
+			"C:\\Users\\na_th\\Desktop\\git\\nes_work\\multicart\\src\\tontis\\dev"
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"Vane",
+			"maxSubstep",
+			"CLR",
+			"domenu",
+			"MENU",
+			"cluster_samples",
+			"section",
+			"windowHeight",
+			"titlebar",
+			"languageMod",
+			"FFFF26",
+			"runchapter",
+			"chapterNumber",
+			"waitdepress",
+			"selectchapter",
+			"ctr",
+			"main.bex",
+			".-",
+			"towards",
+			"qr",
+			"header_113",
+			"(PAD_SELECT|PAD_B)",
+			"(PAD_SELECT | PAD_B)",
+			"suffer",
+			"show_attributes",
+			"%",
+			"STEPS_ON",
+			"steps",
+			"%",
+			"pal_spr",
+			"pal_ss",
+			"pal_bg",
+			"PLAYER_DIE_AND_RESPAWN",
+			"pkilled",
+			"tile_got",
+			"spin",
+			"PLAYER_PUAS",
+			"PLAYER_PUASç",
+			"puas",
+			"puas_x [gpit]",
+			"pua",
+			"puas",
+			"game_sonic",
+			"fskip_ctr",
+			"pal",
+			"ticks",
+			"menu",
+			"0xB0",
+			"ENS_PURSUING",
+			"241",
+			"http",
+			"URL",
+			"update",
+			"pobject",
+			"texts",
+			"game_res",
+			"texts",
+			"0",
+			"_a",
+			"n_bolts",
+			"player_pro",
+			"sspl_",
+			"hotspots",
+			"rdx",
+			"[4]",
+			"player_hit",
+			"ENABLE_COCO_AIMED",
+			"COCO_FAIR_D",
+			"rds16",
+			"min",
+			"delta",
+			"0xff",
+			"MAX",
+			"MULTI",
+			"player_hit",
+			"locksI",
+			"_attr",
+			"process_tile",
+			"phit",
+			"pregotten",
+			"spr_id",
+			"gpjt",
+			"isplatform",
+			"px +=",
+			"en_status",
+			"en_s",
+			"pfacing",
+			"pfr",
+			"0",
+			"CUMULATIVE",
+			"player",
+			"it1",
+			"pl0",
+			"_a",
+			"en0",
+			"initlib",
+			"start",
+			"cli",
+			"nmi",
+			"plife",
+			"lives",
+			"COMM_INITS",
+			"hact",
+			"w_pant",
+			":",
+			"pals",
+			"zerobss",
+			"roomlocks",
+			"L27DA",
+			"palace",
+			"PAD_B",
+			"timer",
+			"348",
+			"cart.nes",
+			"done",
+			"10x8",
+			"COMM_POOL [3]",
+			"COMM_POOL [0x0e]",
+			"COMM_POOL [0x03]",
+			"COMM_POOL [0x02]",
+			"COMM_POOL [0x01]",
+			"COMM_POOL [0x00]",
+			"COMM_POOL [0x04]",
+			"GNROM",
+			"split_and_wait",
+			"split",
+			"kill",
+			"phit"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+			"VANE",
+			".",
+			"(PAD_SELECT | PAD_B | PAD_UP)",
+			"/",
+			"_puas_x",
+			"239",
+			"1",
+			"_b",
+			"BOLTS_MAX",
+			"sspl_ninjajar_",
+			"sspl_cheril_",
+			"[N_ENEMS]",
+			"gpsint",
+			"MIN",
+			"DELTA",
+			"0",
+			"_buff",
+			"pregotten",
+			"is_platform",
+			"en_state",
+			"psprid",
+			"\n",
+			"it0",
+			"pl1",
+			"_b",
+			"en1",
+			"gpit",
+			"lala.nes",
+			"cutscene_do",
+			"10x8",
+			"COMM_INITS",
+			"COMM_CHECKSUM",
+			"COMM_INITS",
+			"COMM_LIVES",
+			"COMM_LEVEL",
+			"COMM_REG",
+			"COMM_GS",
+			"09",
+			"08",
+			"_b",
+			"2",
+			"IMGD",
+			"0",
+			"max_pants",
+			"sc_c",
+			"_b",
+			"ROM3",
+			"pl_",
+			"en",
+			"spy",
+			"spx",
+			"gpx",
+			"0",
+			"y",
+			"Colours",
+			"SG_",
+			"spr_pla_",
+			"on_p",
+			"0x20",
+			"_lin_",
+			"rdct",
+			"0x03",
+			"_pl_",
+			"\\n",
+			"\\u",
+			"\\o",
+			"\\i",
+			"\\e",
+			"\\a",
+			"\\n",
+			"\\u",
+			"\\o",
+			"\\i",
+			"\\e",
+			"\\a",
+			"T.A.R.D.I.S.",
+			"8<",
+			"EXTERN_E",
+			"k2t_code",
+			"k2t_i",
+			"k2t_y",
+			"k2t_x",
+			"k2t_i",
+			"000",
+			"6",
+			"5",
+			"55556666O",
+			"TOCINO MARÍN ALBERTITO",
+			"last",
+			"k2t_length",
+			"k2t_last_key",
+			"k2t_selected",
+			"k2t_color",
+			"..\\..\\",
+			"/",
+			"myFileLen",
+			"RXVAL",
+			"AXVAL",
+			"RXVAL",
+			"pixels",
+			"pixel",
+			"defined (",
+			"/",
+			"\\"
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 2,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "tutorial.md",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 8338,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								8338,
+								8338
+							]
+						],
+						"settings":
+						{
+							"auto_name": "Tutorial",
+							"incomplete_sync": null,
+							"syntax": "Packages/Markdown Extended/Syntaxes/Markdown Extended.sublime-syntax",
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 3803.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "src/vane.bex",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 28868,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								189,
+								83
+							]
+						],
+						"settings":
+						{
+							"in_converting": true,
+							"incomplete_sync": null,
+							"origin_encoding": "CP949",
+							"remote_loading": false,
+							"synced": false,
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "src/script/sp01c.spt",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 498,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								498,
+								0
+							]
+						],
+						"settings":
+						{
+							"incomplete_sync": null,
+							"syntax": "Packages/Text/Plain text.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "src/script/sp00c.spt",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 402,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								52,
+								0
+							]
+						],
+						"settings":
+						{
+							"incomplete_sync": null,
+							"syntax": "Packages/Text/Plain text.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 3,
+					"type": "text"
+				},
+				{
+					"buffer": 4,
+					"file": "scripting.md",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 9517,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								3255,
+								3255
+							]
+						],
+						"settings":
+						{
+							"incomplete_sync": null,
+							"origin_encoding": "ASCII",
+							"remote_loading": false,
+							"synced": false,
+							"syntax": "Packages/Markdown Extended/Syntaxes/Markdown Extended.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 1261.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 8,
+					"type": "text"
+				},
+				{
+					"buffer": 5,
+					"file": "readme.md",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 15719,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1229,
+								1229
+							]
+						],
+						"settings":
+						{
+							"incomplete_sync": null,
+							"origin_encoding": "ASCII",
+							"remote_loading": false,
+							"synced": false,
+							"syntax": "Packages/Markdown Extended/Syntaxes/Markdown Extended.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 9,
+					"type": "text"
+				}
+			]
+		},
+		{
+			"selected": 0,
+			"sheets":
+			[
+				{
+					"buffer": 6,
+					"file": "src/menu.bex",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1610,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								229,
+								229
+							]
+						],
+						"settings":
+						{
+							"incomplete_sync": null,
+							"origin_encoding": "ASCII",
+							"remote_loading": false,
+							"synced": false,
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"type": "text"
+				},
+				{
+					"buffer": 7,
+					"file": "/D/Google Drive/Maritrini/dev/genesis/EspTie/gen/script/sp08.spt",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 10594,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								633,
+								633
+							]
+						],
+						"settings":
+						{
+							"incomplete_sync": null,
+							"remote_loading": false,
+							"synced": false,
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 6,
+					"type": "text"
+				},
+				{
+					"buffer": 8,
+					"file": "src/main.bex",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1025,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								437,
+								437
+							]
+						],
+						"settings":
+						{
+							"incomplete_sync": null,
+							"origin_encoding": "ASCII",
+							"remote_loading": false,
+							"synced": false,
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 5,
+					"type": "text"
+				},
+				{
+					"buffer": 9,
+					"file": "/D/Google Drive/Maritrini/dev/genesis/EspTie/gen/script/sp00.spt",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 574,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								574,
+								574
+							]
+						],
+						"settings":
+						{
+							"in_converting": true,
+							"incomplete_sync": null,
+							"origin_encoding": "GBK",
+							"remote_loading": false,
+							"synced": false,
+							"syntax": "Packages/Text/Plain text.tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 7,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 26.0
+	},
+	"input":
+	{
+		"height": 36.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			],
+			[
+				1,
+				0,
+				2,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			0.5,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.exec":
+	{
+		"height": 100.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"output.sftp":
+	{
+		"height": 210.0
+	},
+	"pinned_build_system": "",
+	"project": "vane.sublime-project",
+	"replace":
+	{
+		"height": 74.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 500.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"",
+				"C:\\Users\\na_th\\Desktop\\git\\nes_work\\multicart_INL\\multicart_11.sublime-project"
+			]
+		],
+		"width": 380.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 135.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}

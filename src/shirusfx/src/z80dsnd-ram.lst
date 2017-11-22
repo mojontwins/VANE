@@ -1,0 +1,2248 @@
+001   0000             ;4ch digital player v1.1x
+002   0000             ;6-bit samples with any length, 16000Hz
+003   0000             ;by Shiru, 04.05.07 debug version
+004   0000             
+005   0000             
+006   0000                 ;DEFINE DEBUG
+007   0000              
+008   0000             ;sample output, occurs every 224t (3580000/16000, i.e. fCPU/fSampleRate)
+009   0000             
+010   0000                 MACRO sampleOutput
+011   0000~                exx             ;4
+012   0000~                ld a,(hl)       ;7 read sample from play buffer
+013   0000~                ld (hl),e       ;7 clear play buffer
+014   0000~                ld (bc),a       ;7 play sample
+015   0000~                inc l           ;4 increment with looping
+016   0000~                exx             ;4=33t
+017   0000                 ENDM
+018   0000              
+019   0000             
+020   0000             
+021   0000             ;read next two bytes and mix with output buffer
+022   0000             ;  SP=current position in sample
+023   0000             ;  HL=current position in mix buffer
+024   0000             
+025   0000                 MACRO readAndMix
+026   0000~                pop de      ;12 (because wait in ROM, not sure for exact time)
+027   0000~                ld a,e      ;4
+028   0000~                add a,(hl)  ;7
+029   0000~                ld (hl),a   ;7
+030   0000~                inc l       ;4
+031   0000~                ld a,d      ;4
+032   0000~                add a,(hl)  ;7
+033   0000~                ld (hl),a   ;7
+034   0000~                inc l       ;4=56t
+035   0000                 ENDM
+036   0000              
+037   0000              
+038   0000              
+039   0000             ;bankswitch, only 7 bits from 9 is used (enough for addressing 4MB ROM)
+040   0000             
+041   0000                 MACRO bankSwitch
+042   0000~                ld hl,#6000 ;10
+043   0000~                ld (hl),a   ;7
+044   0000~                rra         ;4
+045   0000~                ld (hl),a   ;7
+046   0000~                rra         ;4
+047   0000~                ld (hl),a   ;7
+048   0000~                rra         ;4
+049   0000~                ld (hl),a   ;7
+050   0000~                rra         ;4
+051   0000~                ld (hl),a   ;7
+052   0000~                rra         ;4
+053   0000~                ld (hl),a   ;7
+054   0000~                rra         ;4
+055   0000~                ld (hl),a   ;7
+056   0000~                ; Read from RAM.
+057   0000~                ld a, 1
+058   0000~                ld (hl), a
+059   0000~                ld (hl), a
+060   0000~                ;
+061   0000~                ld (hl),l   ;7
+062   0000~                ld (hl),l   ;7=97t
+063   0000                 ENDM
+064   0000              
+065   0000             
+066   0000             
+067   0000                 INCLUDE z80delay.asm
+001+  0000             ;different delays
+002+  0000             ;be aware about registers usage when reuse this code
+003+  0000             
+004+  0000             
+005+  0000             
+006+  0000             ;delay for 9t
+007+  0000             
+008+  0000                 MACRO delay9t
+009+  0000~                ld a,r          ;9t
+010+  0000                 ENDM
+011+  0000              
+012+  0000             ;delay for 10t
+013+  0000             
+014+  0000                 MACRO delay10t
+015+  0000~                ld de,0         ;10t
+016+  0000                 ENDM
+017+  0000              
+018+  0000             ;delay for 15t
+019+  0000             
+020+  0000                 MACRO delay15t
+021+  0000~                or 0            ;7
+022+  0000~                nop             ;4
+023+  0000~                nop             ;4=15t
+024+  0000                 ENDM
+025+  0000              
+026+  0000             ;delay for 18t
+027+  0000             
+028+  0000                 MACRO delay18t
+029+  0000~                ld ix,0         ;14
+030+  0000~                nop             ;4=18t
+031+  0000                 ENDM
+032+  0000              
+033+  0000             ;delay for 20t
+034+  0000             
+035+  0000                 MACRO delay20t
+036+  0000~                bit 0,(ix)      ;20
+037+  0000                 ENDM
+038+  0000             
+039+  0000             ;delay for 36t
+040+  0000             
+041+  0000                 MACRO delay36t
+042+  0000~                bit 0,(ix)      ;20
+043+  0000~                ld bc,0         ;10
+044+  0000~                inc bc          ;6=36t
+045+  0000                 ENDM
+046+  0000              
+047+  0000             ;delay for 44t
+048+  0000             
+049+  0000                 MACRO delay44t
+050+  0000~                bit 0,(ix)      ;20
+051+  0000~                bit 0,(ix)      ;20
+052+  0000~                nop             ;4=44t
+053+  0000                 ENDM
+054+  0000              
+055+  0000             ;delay for 47t
+056+  0000             
+057+  0000                 MACRO delay47t
+058+  0000~                bit 0,(ix)      ;20
+059+  0000~                bit 0,(ix)      ;20
+060+  0000~                or 0            ;7=47t
+061+  0000                 ENDM
+062+  0000              
+063+  0000             ;delay for 55t
+064+  0000             
+065+  0000                 MACRO delay55t
+066+  0000~                bit 0,(ix)      ;20
+067+  0000~                bit 0,(ix)      ;20
+068+  0000~                or 0            ;7
+069+  0000~                nop             ;4
+070+  0000~                nop             ;4=55t
+071+  0000                 ENDM
+072+  0000             
+073+  0000             ;delay for 58t
+074+  0000             
+075+  0000                 MACRO delay58t
+076+  0000~                bit 0,(ix)      ;20
+077+  0000~                bit 0,(ix)      ;20
+078+  0000~                ld bc,0         ;10
+079+  0000~                nop             ;4
+080+  0000~                nop             ;4=58t
+081+  0000                 ENDM
+082+  0000             
+083+  0000             ;delay for 67t
+084+  0000             
+085+  0000                 MACRO delay67t
+086+  0000~                bit 0,(ix)      ;20
+087+  0000~                bit 0,(ix)      ;20
+088+  0000~                bit 0,(ix)      ;20
+089+  0000~                ld c,0          ;7=67t
+090+  0000                 ENDM
+091+  0000              
+092+  0000             ;delay for 68t
+093+  0000             
+094+  0000                 MACRO delay68t
+095+  0000~                bit 0,(ix)      ;20
+096+  0000~                bit 0,(ix)      ;20
+097+  0000~                bit 0,(ix)      ;20
+098+  0000~                nop             ;4
+099+  0000~                nop             ;4=68t
+100+  0000                 ENDM
+101+  0000              
+102+  0000             ;delay for 71t
+103+  0000             
+104+  0000                 MACRO delay71t
+105+  0000~                bit 0,(ix)      ;20
+106+  0000~                bit 0,(ix)      ;20
+107+  0000~                bit 0,(ix)      ;20
+108+  0000~                ld b,0          ;7
+109+  0000~                nop             ;4=71t
+110+  0000                 ENDM
+111+  0000              
+112+  0000             ;delay for 79t
+113+  0000             
+114+  0000                 MACRO delay79t
+115+  0000~                ld b,4          ;7
+116+  0000~                dec b           ;4
+117+  0000~                jp nz,$-1       ;10
+118+  0000~                nop             ;4
+119+  0000~                nop             ;4
+120+  0000~                nop             ;4
+121+  0000~                nop             ;4=79t
+122+  0000                 ENDM
+123+  0000              
+124+  0000             ;delay for 83t
+125+  0000             
+126+  0000                 MACRO delay83t
+127+  0000~                ld c,5          ;7
+128+  0000~                dec b           ;4
+129+  0000~                jp nz,$-1       ;10
+130+  0000~                inc bc          ;6=83t
+131+  0000                 ENDM
+132+  0000              
+133+  0000             ;delay for 85t
+134+  0000             
+135+  0000                 MACRO delay85t
+136+  0000~                ld de,4         ;10
+137+  0000~                dec e           ;4
+138+  0000~                jp nz,$-1       ;10
+139+  0000~                ld e,0          ;7
+140+  0000~                nop             ;4
+141+  0000~                nop             ;4
+142+  0000~                nop             ;4=85t
+143+  0000                 ENDM
+144+  0000              
+145+  0000             ;delay for 102t
+146+  0000             
+147+  0000                 MACRO delay102t
+148+  0000~                ld bc,6         ;10
+149+  0000~                dec c           ;4
+150+  0000~                jp nz,$-1       ;10
+151+  0000~                nop             ;4
+152+  0000~                nop             ;4=102t
+153+  0000                 ENDM
+154+  0000             
+155+  0000             ;delay for 110t
+156+  0000             
+157+  0000                 MACRO delay110t
+158+  0000~                ld bc,6         ;10
+159+  0000~                dec c           ;4
+160+  0000~                jp nz,$-1       ;10
+161+  0000~                ld bc,0         ;10
+162+  0000~                inc bc          ;6=110t
+163+  0000                 ENDM
+164+  0000              
+165+  0000             ;delay for 111t
+166+  0000             
+167+  0000                 MACRO delay111t
+168+  0000~                ld d,7          ;7
+169+  0000~                dec d           ;4
+170+  0000~                jp nz,$-1       ;10
+171+  0000~                inc de          ;6=111t
+172+  0000                 ENDM
+173+  0000              
+174+  0000             ;delay for 123t
+175+  0000             
+176+  0000                 MACRO delay123t
+177+  0000~                ld bc,7         ;10
+178+  0000~                dec c           ;4
+179+  0000~                jp nz,$-1       ;10
+180+  0000~                ld c,0          ;7
+181+  0000~                nop             ;4
+182+  0000~                nop             ;4=123t
+183+  0000                 ENDM
+184+  0000             
+185+  0000             ;delay for 114t
+186+  0000             
+187+  0000                 MACRO delay114t
+188+  0000~                ld bc,7         ;10
+189+  0000~                dec c           ;4
+190+  0000~                jp nz,$-1       ;10
+191+  0000~                inc bc          ;6=114t
+192+  0000                 ENDM
+193+  0000              
+194+  0000             ;delay for 127t
+195+  0000             
+196+  0000                 MACRO delay127t
+197+  0000~                ld bc,7         ;10
+198+  0000~                dec c           ;4
+199+  0000~                jp nz,$-1       ;10
+200+  0000~                ld c,0          ;7
+201+  0000~                nop             ;4
+202+  0000~                nop             ;4
+203+  0000~                nop             ;4=127t
+204+  0000                 ENDM
+205+  0000             
+206+  0000             ;delay for 181t
+207+  0000             
+208+  0000                 MACRO delay181t
+209+  0000~                ld c,12         ;7
+210+  0000~                dec c           ;4
+211+  0000~                jp nz,$-1       ;10
+212+  0000~                inc bc          ;6=181t
+213+  0000                 ENDM
+214+  0000              
+215+  0000             ;delay for 191t
+216+  0000             
+217+  0000                 MACRO delay191t
+218+  0000~                ld c,12         ;7
+219+  0000~                dec c           ;4
+220+  0000~                jp nz,$-1       ;10
+221+  0000~                ld hl,(0)       ;16=191t
+222+  0000                 ENDM
+223+  0000              
+224+  0000             ;delay for 248t
+225+  0000             
+226+  0000                 MACRO delay248t
+227+  0000~                ld bc,17        ;10
+228+  0000~                dec c           ;4
+229+  0000~                jp nz,$-1       ;10=248t
+230+  0000                 ENDM
+068   0000              
+069   0000              
+070   0000              
+071   0000              
+072   0000             ;------------------------------------------------------------------------------
+073   0000             ;main code starts here
+074   0000             ;------------------------------------------------------------------------------
+075   0000             
+076   0000             
+077   0000                 org #0000
+078   0000              
+079   0000 F3              di
+080   0001 31 FF 1F        ld sp,#1fff         ;used only in init, to call wrYmPortA
+081   0004              
+082   0004                 ;setup variables
+083   0004              
+084   0004 21 00 0A        ld hl,mixBuffer1
+085   0007 22 E6 08        ld (bufPlay),hl
+086   000A 21 00 09        ld hl,mixBuffer0
+087   000D 22 E4 08        ld (bufWrite),hl
+088   0010 DD 21 00 00     ld ix,0             ;to be sure what delays with IX will work without wait
+089   0014              
+090   0014 3A F0 1F        ld a,(#1ff0)        ;get bank for empty buffer
+091   0017 32 E1 08        ld (emptyBank),a
+092   001A 3A F1 1F        ld a,(#1ff1)        ;get offset for empty buffer
+093   001D 47              ld b,a
+094   001E 0E 00           ld c,0
+095   0020 ED 43 E2 08     ld (emptyOff),bc
+096   0024              
+097   0024 AF              xor a
+098   0025 32 F0 1F        ld (#1ff0),a        ;no new sound
+099   0028              
+100   0028                 ;clear mix buffers
+101   0028              
+102   0028 11 01 09        ld de,mixBuffer0+1
+103   002B 01 FF 01        ld bc,511
+104   002E 36 80           ld (hl),#80         ;#80 as empty
+105   0030 ED B0           ldir
+106   0032              
+107   0032                 ;clear channel descriptors
+108   0032              
+109   0032 21 E8 08        ld hl,chnList
+110   0035 06 10           ld b,16
+111   0037             clearList
+112   0037 77              ld (hl),a
+113   0038 2C              inc l
+114   0039 10 FC           djnz clearList
+115   003B             
+116   003B                 ;ym2612 init
+117   003B              
+118   003B 11 80 2B        ld de,#2b80     ;switch on DAC
+119   003E CD D2 08        call wrYmPortA
+120   0041 11 80 2A        ld de,#2a80     ;first output to DAC, to make register selected
+121   0044 CD D2 08        call wrYmPortA
+122   0047              
+123   0047                 ;load alternative registers set
+124   0047              
+125   0047 D9              exx
+126   0048 01 01 40        ld bc,#4001     ;ym2612 data port
+127   004B 1E 80           ld e,#80        ;for buffer clearing
+128   004D 2A E6 08        ld hl,(bufPlay)
+129   0050 D9              exx
+130   0051             
+131   0051                 IFDEF DEBUG
+132   0051~                ld a,'.'
+133   0051~                ld (#1fe0),a
+134   0051                 ENDIF
+135   0051              
+136   0051             mainLoop
+137   0051             
+138   0051             ;samplecount:
+139   0051             
+140   0051                 IFDEF DEBUG
+141   0051~                ld a,'0'
+142   0051~                ld (#1fe0),a
+143   0051                 ENDIF
+144   0051              
+145   0051                 ;process channel #0
+146   0051             ;0
+147   0051                 ;set SP to offset, while playing 1 sample
+148   0051                 sampleOutput        ;33t
+148   0051 D9          >    exx             ;4
+148   0052 7E          >    ld a,(hl)       ;7 read sample from play buffer
+148   0053 73          >    ld (hl),e       ;7 clear play buffer
+148   0054 02          >    ld (bc),a       ;7 play sample
+148   0055 2C          >    inc l           ;4 increment with looping
+148   0056 D9          >    exx             ;4=33t
+149   0057 2A EA 08        ld hl,(chnList+2)   ;16
+150   005A 7C              ld a,h              ;4
+151   005B B5              or l                ;4
+152   005C C2 69 00        jp nz,ch0Setup      ;10
+153   005F ED 7B E2 08     ld sp,(emptyOff)    ;20-+-A
+154   0063 3A E1 08        ld a,(emptyBank)    ;13 |
+155   0066 C3 73 00        jp ch0SetOK         ;10-+
+156   0069             ch0Setup
+157   0069 21 E8 08        ld hl,chnList+0     ;10-+-B
+158   006C 66              ld h,(hl)           ;7  |
+159   006D 2E 00           ld l,0              ;7  |
+160   006F F9              ld sp,hl            ;6  |
+161   0070 3A E9 08        ld a,(chnList+1)    ;13-+
+162   0073             ch0SetOK
+163   0073 08              ex af,af            ;4
+164   0074                 delay110t           ;=224t
+164   0074 01 06 00    >    ld bc,6         ;10
+164   0077 0D          >    dec c           ;4
+164   0078 C2 77 00    >    jp nz,$-1       ;10
+164   007B 01 00 00    >    ld bc,0         ;10
+164   007E 03          >    inc bc          ;6=110t
+165   007F             
+166   007F                 IFDEF DEBUG
+167   007F~                ld a,'1'
+168   007F~                ld (#1fe0),a
+169   007F                 ENDIF
+170   007F              
+171   007F             ;1
+172   007F                 ;select bank, while playing 1 sample
+173   007F                 sampleOutput        ;33t
+173   007F D9          >    exx             ;4
+173   0080 7E          >    ld a,(hl)       ;7 read sample from play buffer
+173   0081 73          >    ld (hl),e       ;7 clear play buffer
+173   0082 02          >    ld (bc),a       ;7 play sample
+173   0083 2C          >    inc l           ;4 increment with looping
+173   0084 D9          >    exx             ;4=33t
+174   0085 08              ex af,af            ;4
+175   0086                 bankSwitch          ;97t
+175   0086 21 00 60    >    ld hl,#6000 ;10
+175   0089 77          >    ld (hl),a   ;7
+175   008A 1F          >    rra         ;4
+175   008B 77          >    ld (hl),a   ;7
+175   008C 1F          >    rra         ;4
+175   008D 77          >    ld (hl),a   ;7
+175   008E 1F          >    rra         ;4
+175   008F 77          >    ld (hl),a   ;7
+175   0090 1F          >    rra         ;4
+175   0091 77          >    ld (hl),a   ;7
+175   0092 1F          >    rra         ;4
+175   0093 77          >    ld (hl),a   ;7
+175   0094 1F          >    rra         ;4
+175   0095 77          >    ld (hl),a   ;7
+175   0096 3E 01       >    ld a, 1
+175   0098 77          >    ld (hl), a
+175   0099 77          >    ld (hl), a
+175   009A 75          >    ld (hl),l   ;7
+175   009B 75          >    ld (hl),l   ;7=97t
+176   009C                 delay67t            ;67t
+176   009C DD CB 00 46 >    bit 0,(ix)      ;20
+176   00A0 DD CB 00 46 >    bit 0,(ix)      ;20
+176   00A4 DD CB 00 46 >    bit 0,(ix)      ;20
+176   00A8 0E 00       >    ld c,0          ;7=67t
+177   00AA 2A E4 08        ld hl,(bufWrite)    ;16
+178   00AD                                     ;=224-7t, see below
+179   00AD              
+180   00AD                 IFDEF DEBUG
+181   00AD~                ld a,'2'
+182   00AD~                ld (#1fe0),a
+183   00AD                 ENDIF
+184   00AD              
+185   00AD             ;2
+186   00AD                 ;read and mix 252 bytes, while playing 42 samples
+187   00AD 06 2A           ld b,42             ;7 taken from ^^^
+188   00AF             ch0Render
+189   00AF                 sampleOutput        ;33t
+189   00AF D9          >    exx             ;4
+189   00B0 7E          >    ld a,(hl)       ;7 read sample from play buffer
+189   00B1 73          >    ld (hl),e       ;7 clear play buffer
+189   00B2 02          >    ld (bc),a       ;7 play sample
+189   00B3 2C          >    inc l           ;4 increment with looping
+189   00B4 D9          >    exx             ;4=33t
+190   00B5                 readAndMix
+190   00B5 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+190   00B6 7B          >    ld a,e      ;4
+190   00B7 86          >    add a,(hl)  ;7
+190   00B8 77          >    ld (hl),a   ;7
+190   00B9 2C          >    inc l       ;4
+190   00BA 7A          >    ld a,d      ;4
+190   00BB 86          >    add a,(hl)  ;7
+190   00BC 77          >    ld (hl),a   ;7
+190   00BD 2C          >    inc l       ;4=56t
+191   00BE                 readAndMix
+191   00BE D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+191   00BF 7B          >    ld a,e      ;4
+191   00C0 86          >    add a,(hl)  ;7
+191   00C1 77          >    ld (hl),a   ;7
+191   00C2 2C          >    inc l       ;4
+191   00C3 7A          >    ld a,d      ;4
+191   00C4 86          >    add a,(hl)  ;7
+191   00C5 77          >    ld (hl),a   ;7
+191   00C6 2C          >    inc l       ;4=56t
+192   00C7                 readAndMix          ;3*56=168t
+192   00C7 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+192   00C8 7B          >    ld a,e      ;4
+192   00C9 86          >    add a,(hl)  ;7
+192   00CA 77          >    ld (hl),a   ;7
+192   00CB 2C          >    inc l       ;4
+192   00CC 7A          >    ld a,d      ;4
+192   00CD 86          >    add a,(hl)  ;7
+192   00CE 77          >    ld (hl),a   ;7
+192   00CF 2C          >    inc l       ;4=56t
+193   00D0                 delay9t             ;9t
+193   00D0 ED 5F       >    ld a,r          ;9t
+194   00D2 05              dec b               ;4
+195   00D3 C2 AF 00        jp nz,ch0Render     ;10
+196   00D6                                     ;=224t
+197   00D6              
+198   00D6                 IFDEF DEBUG
+199   00D6~                ld a,'3'
+200   00D6~                ld (#1fe0),a
+201   00D6                 ENDIF
+202   00D6              
+203   00D6             ;44
+204   00D6                 ;read and mix last 4 bytes, while playing 1 sample
+205   00D6                 sampleOutput        ;33t
+205   00D6 D9          >    exx             ;4
+205   00D7 7E          >    ld a,(hl)       ;7 read sample from play buffer
+205   00D8 73          >    ld (hl),e       ;7 clear play buffer
+205   00D9 02          >    ld (bc),a       ;7 play sample
+205   00DA 2C          >    inc l           ;4 increment with looping
+205   00DB D9          >    exx             ;4=33t
+206   00DC                 readAndMix
+206   00DC D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+206   00DD 7B          >    ld a,e      ;4
+206   00DE 86          >    add a,(hl)  ;7
+206   00DF 77          >    ld (hl),a   ;7
+206   00E0 2C          >    inc l       ;4
+206   00E1 7A          >    ld a,d      ;4
+206   00E2 86          >    add a,(hl)  ;7
+206   00E3 77          >    ld (hl),a   ;7
+206   00E4 2C          >    inc l       ;4=56t
+207   00E5                 readAndMix          ;2*56=112t
+207   00E5 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+207   00E6 7B          >    ld a,e      ;4
+207   00E7 86          >    add a,(hl)  ;7
+207   00E8 77          >    ld (hl),a   ;7
+207   00E9 2C          >    inc l       ;4
+207   00EA 7A          >    ld a,d      ;4
+207   00EB 86          >    add a,(hl)  ;7
+207   00EC 77          >    ld (hl),a   ;7
+207   00ED 2C          >    inc l       ;4=56t
+208   00EE                 delay79t            ;=224t
+208   00EE 06 04       >    ld b,4          ;7
+208   00F0 05          >    dec b           ;4
+208   00F1 C2 F0 00    >    jp nz,$-1       ;10
+208   00F4 00          >    nop             ;4
+208   00F5 00          >    nop             ;4
+208   00F6 00          >    nop             ;4
+208   00F7 00          >    nop             ;4=79t
+209   00F8              
+210   00F8                 IFDEF DEBUG
+211   00F8~                ld a,'4'
+212   00F8~                ld (#1fe0),a
+213   00F8                 ENDIF
+214   00F8              
+215   00F8             ;45
+216   00F8                 ;update sample position and check for sample end, while playing 1 sample
+217   00F8                 sampleOutput        ;33t
+217   00F8 D9          >    exx             ;4
+217   00F9 7E          >    ld a,(hl)       ;7 read sample from play buffer
+217   00FA 73          >    ld (hl),e       ;7 clear play buffer
+217   00FB 02          >    ld (bc),a       ;7 play sample
+217   00FC 2C          >    inc l           ;4 increment with looping
+217   00FD D9          >    exx             ;4=33t
+218   00FE              
+219   00FE 21 E8 08        ld hl,chnList       ;10
+220   0101 34              inc (hl)            ;11
+221   0102 7E              ld a,(hl)           ;7
+222   0103 23              inc hl              ;6
+223   0104 B7              or a                ;4
+224   0105 C2 0E 01        jp nz,ch0BankNoInc  ;10
+225   0108 3E 80           ld a,#80            ;7 -+-A
+226   010A 34              inc (hl)            ;11 |
+227   010B C3 16 01        jp ch0OffsetWr      ;10-+
+228   010E             ch0BankNoInc
+229   010E 06 00           ld b,0              ;7 -+-B
+230   0110 06 00           ld b,0              ;7  |
+231   0112 40              ld b,b              ;4  |
+232   0113 C3 16 01        jp $+3              ;10-+
+233   0116             ch0OffsetWr
+234   0116 2B              dec hl              ;6
+235   0117 77              ld (hl),a           ;7
+236   0118 2A EA 08        ld hl,(chnList+2)   ;16
+237   011B 7C              ld a,h              ;4
+238   011C B5              or l                ;4
+239   011D CA 24 01        jp z,ch0LenNoInc    ;10
+240   0120 2B              dec hl              ;6 -+-A
+241   0121 C3 28 01        jp ch0LenWr         ;10-+
+242   0124             ch0LenNoInc
+243   0124 0B              dec bc              ;6 -+-B
+244   0125 C3 28 01        jp $+3              ;10-+
+245   0128             ch0LenWr
+246   0128 22 EA 08        ld (chnList+2),hl   ;16
+247   012B                 delay36t            ;=224t
+247   012B DD CB 00 46 >    bit 0,(ix)      ;20
+247   012F 01 00 00    >    ld bc,0         ;10
+247   0132 03          >    inc bc          ;6=36t
+248   0133             
+249   0133                 IFDEF DEBUG
+250   0133~                ld a,'5'
+251   0133~                ld (#1fe0),a
+252   0133                 ENDIF
+253   0133             
+254   0133                 ;process channel #1
+255   0133             ;46
+256   0133                 ;set SP to offset, while playing 1 sample
+257   0133                 sampleOutput        ;33t
+257   0133 D9          >    exx             ;4
+257   0134 7E          >    ld a,(hl)       ;7 read sample from play buffer
+257   0135 73          >    ld (hl),e       ;7 clear play buffer
+257   0136 02          >    ld (bc),a       ;7 play sample
+257   0137 2C          >    inc l           ;4 increment with looping
+257   0138 D9          >    exx             ;4=33t
+258   0139 2A EE 08        ld hl,(chnList+6)   ;16
+259   013C 7C              ld a,h              ;4
+260   013D B5              or l                ;4
+261   013E C2 4B 01        jp nz,ch1Setup      ;10
+262   0141 ED 7B E2 08     ld sp,(emptyOff)    ;20-+-A
+263   0145 3A E1 08        ld a,(emptyBank)    ;13 |
+264   0148 C3 55 01        jp ch1SetOK         ;10-+
+265   014B             ch1Setup
+266   014B 21 EC 08        ld hl,chnList+4     ;10-+-B
+267   014E 66              ld h,(hl)           ;7  |
+268   014F 2E 00           ld l,0              ;7  |
+269   0151 F9              ld sp,hl            ;6  |
+270   0152 3A ED 08        ld a,(chnList+5)    ;13-+
+271   0155             ch1SetOK
+272   0155 08              ex af,af            ;4
+273   0156                 delay110t           ;=224t
+273   0156 01 06 00    >    ld bc,6         ;10
+273   0159 0D          >    dec c           ;4
+273   015A C2 59 01    >    jp nz,$-1       ;10
+273   015D 01 00 00    >    ld bc,0         ;10
+273   0160 03          >    inc bc          ;6=110t
+274   0161             
+275   0161                 IFDEF DEBUG
+276   0161~                ld a,'6'
+277   0161~                ld (#1fe0),a
+278   0161                 ENDIF
+279   0161              
+280   0161             ;47
+281   0161                 ;select bank, while playing 1 sample
+282   0161                 sampleOutput        ;33t
+282   0161 D9          >    exx             ;4
+282   0162 7E          >    ld a,(hl)       ;7 read sample from play buffer
+282   0163 73          >    ld (hl),e       ;7 clear play buffer
+282   0164 02          >    ld (bc),a       ;7 play sample
+282   0165 2C          >    inc l           ;4 increment with looping
+282   0166 D9          >    exx             ;4=33t
+283   0167 08              ex af,af            ;4
+284   0168                 bankSwitch          ;97t
+284   0168 21 00 60    >    ld hl,#6000 ;10
+284   016B 77          >    ld (hl),a   ;7
+284   016C 1F          >    rra         ;4
+284   016D 77          >    ld (hl),a   ;7
+284   016E 1F          >    rra         ;4
+284   016F 77          >    ld (hl),a   ;7
+284   0170 1F          >    rra         ;4
+284   0171 77          >    ld (hl),a   ;7
+284   0172 1F          >    rra         ;4
+284   0173 77          >    ld (hl),a   ;7
+284   0174 1F          >    rra         ;4
+284   0175 77          >    ld (hl),a   ;7
+284   0176 1F          >    rra         ;4
+284   0177 77          >    ld (hl),a   ;7
+284   0178 3E 01       >    ld a, 1
+284   017A 77          >    ld (hl), a
+284   017B 77          >    ld (hl), a
+284   017C 75          >    ld (hl),l   ;7
+284   017D 75          >    ld (hl),l   ;7=97t
+285   017E                 delay67t            ;67t
+285   017E DD CB 00 46 >    bit 0,(ix)      ;20
+285   0182 DD CB 00 46 >    bit 0,(ix)      ;20
+285   0186 DD CB 00 46 >    bit 0,(ix)      ;20
+285   018A 0E 00       >    ld c,0          ;7=67t
+286   018C 2A E4 08        ld hl,(bufWrite)    ;16
+287   018F                                     ;=224-7t, see below
+288   018F              
+289   018F                 IFDEF DEBUG
+290   018F~                ld a,'7'
+291   018F~                ld (#1fe0),a
+292   018F                 ENDIF
+293   018F              
+294   018F             ;48
+295   018F                 ;read and mix 252 bytes, while playing 42 samples
+296   018F 06 2A           ld b,42             ;7 taken from ^^^
+297   0191             ch1Render
+298   0191                 sampleOutput        ;33t
+298   0191 D9          >    exx             ;4
+298   0192 7E          >    ld a,(hl)       ;7 read sample from play buffer
+298   0193 73          >    ld (hl),e       ;7 clear play buffer
+298   0194 02          >    ld (bc),a       ;7 play sample
+298   0195 2C          >    inc l           ;4 increment with looping
+298   0196 D9          >    exx             ;4=33t
+299   0197                 readAndMix
+299   0197 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+299   0198 7B          >    ld a,e      ;4
+299   0199 86          >    add a,(hl)  ;7
+299   019A 77          >    ld (hl),a   ;7
+299   019B 2C          >    inc l       ;4
+299   019C 7A          >    ld a,d      ;4
+299   019D 86          >    add a,(hl)  ;7
+299   019E 77          >    ld (hl),a   ;7
+299   019F 2C          >    inc l       ;4=56t
+300   01A0                 readAndMix
+300   01A0 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+300   01A1 7B          >    ld a,e      ;4
+300   01A2 86          >    add a,(hl)  ;7
+300   01A3 77          >    ld (hl),a   ;7
+300   01A4 2C          >    inc l       ;4
+300   01A5 7A          >    ld a,d      ;4
+300   01A6 86          >    add a,(hl)  ;7
+300   01A7 77          >    ld (hl),a   ;7
+300   01A8 2C          >    inc l       ;4=56t
+301   01A9                 readAndMix          ;3*56=168t
+301   01A9 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+301   01AA 7B          >    ld a,e      ;4
+301   01AB 86          >    add a,(hl)  ;7
+301   01AC 77          >    ld (hl),a   ;7
+301   01AD 2C          >    inc l       ;4
+301   01AE 7A          >    ld a,d      ;4
+301   01AF 86          >    add a,(hl)  ;7
+301   01B0 77          >    ld (hl),a   ;7
+301   01B1 2C          >    inc l       ;4=56t
+302   01B2                 delay9t             ;9t
+302   01B2 ED 5F       >    ld a,r          ;9t
+303   01B4 05              dec b               ;4
+304   01B5 C2 91 01        jp nz,ch1Render     ;10
+305   01B8                                     ;=224t
+306   01B8              
+307   01B8                 IFDEF DEBUG
+308   01B8~                ld a,'8'
+309   01B8~                ld (#1fe0),a
+310   01B8                 ENDIF
+311   01B8              
+312   01B8             ;90
+313   01B8                 ;read and mix last 4 bytes, while playing 1 sample
+314   01B8                 sampleOutput        ;33t
+314   01B8 D9          >    exx             ;4
+314   01B9 7E          >    ld a,(hl)       ;7 read sample from play buffer
+314   01BA 73          >    ld (hl),e       ;7 clear play buffer
+314   01BB 02          >    ld (bc),a       ;7 play sample
+314   01BC 2C          >    inc l           ;4 increment with looping
+314   01BD D9          >    exx             ;4=33t
+315   01BE                 readAndMix
+315   01BE D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+315   01BF 7B          >    ld a,e      ;4
+315   01C0 86          >    add a,(hl)  ;7
+315   01C1 77          >    ld (hl),a   ;7
+315   01C2 2C          >    inc l       ;4
+315   01C3 7A          >    ld a,d      ;4
+315   01C4 86          >    add a,(hl)  ;7
+315   01C5 77          >    ld (hl),a   ;7
+315   01C6 2C          >    inc l       ;4=56t
+316   01C7                 readAndMix          ;2*56=112t
+316   01C7 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+316   01C8 7B          >    ld a,e      ;4
+316   01C9 86          >    add a,(hl)  ;7
+316   01CA 77          >    ld (hl),a   ;7
+316   01CB 2C          >    inc l       ;4
+316   01CC 7A          >    ld a,d      ;4
+316   01CD 86          >    add a,(hl)  ;7
+316   01CE 77          >    ld (hl),a   ;7
+316   01CF 2C          >    inc l       ;4=56t
+317   01D0                 delay79t            ;=224t
+317   01D0 06 04       >    ld b,4          ;7
+317   01D2 05          >    dec b           ;4
+317   01D3 C2 D2 01    >    jp nz,$-1       ;10
+317   01D6 00          >    nop             ;4
+317   01D7 00          >    nop             ;4
+317   01D8 00          >    nop             ;4
+317   01D9 00          >    nop             ;4=79t
+318   01DA              
+319   01DA                 IFDEF DEBUG
+320   01DA~                ld a,'9'
+321   01DA~                ld (#1fe0),a
+322   01DA                 ENDIF
+323   01DA              
+324   01DA             ;91
+325   01DA                 ;update sample position and check for sample end, while playing 1 sample
+326   01DA                 sampleOutput        ;33t
+326   01DA D9          >    exx             ;4
+326   01DB 7E          >    ld a,(hl)       ;7 read sample from play buffer
+326   01DC 73          >    ld (hl),e       ;7 clear play buffer
+326   01DD 02          >    ld (bc),a       ;7 play sample
+326   01DE 2C          >    inc l           ;4 increment with looping
+326   01DF D9          >    exx             ;4=33t
+327   01E0              
+328   01E0 21 EC 08        ld hl,chnList+4     ;10
+329   01E3 34              inc (hl)            ;11
+330   01E4 7E              ld a,(hl)           ;7
+331   01E5 23              inc hl              ;6
+332   01E6 B7              or a                ;4
+333   01E7 C2 F0 01        jp nz,ch1BankNoInc  ;10
+334   01EA 3E 80           ld a,#80            ;7 -+-A
+335   01EC 34              inc (hl)            ;11 |
+336   01ED C3 F8 01        jp ch1OffsetWr      ;10-+
+337   01F0             ch1BankNoInc
+338   01F0 06 00           ld b,0              ;7 -+-B
+339   01F2 06 00           ld b,0              ;7  |
+340   01F4 40              ld b,b              ;4  |
+341   01F5 C3 F8 01        jp $+3              ;10-+
+342   01F8             ch1OffsetWr
+343   01F8 2B              dec hl              ;6
+344   01F9 77              ld (hl),a           ;7
+345   01FA 2A EE 08        ld hl,(chnList+6)   ;16
+346   01FD 7C              ld a,h              ;4
+347   01FE B5              or l                ;4
+348   01FF CA 06 02        jp z,ch1LenNoInc    ;10
+349   0202 2B              dec hl              ;6 -+-A
+350   0203 C3 0A 02        jp ch1LenWr         ;10-+
+351   0206             ch1LenNoInc
+352   0206 0B              dec bc              ;6 -+-B
+353   0207 C3 0A 02        jp $+3              ;10-+
+354   020A             ch1LenWr
+355   020A 22 EE 08        ld (chnList+6),hl   ;16
+356   020D                 delay36t            ;=224t
+356   020D DD CB 00 46 >    bit 0,(ix)      ;20
+356   0211 01 00 00    >    ld bc,0         ;10
+356   0214 03          >    inc bc          ;6=36t
+357   0215              
+358   0215              
+359   0215                 IFDEF DEBUG
+360   0215~                ld a,'A'
+361   0215~                ld (#1fe0),a
+362   0215                 ENDIF
+363   0215              
+364   0215                 ;process channel #2
+365   0215             ;92
+366   0215                 ;set SP to offset, while playing 1 sample
+367   0215                 sampleOutput        ;33t
+367   0215 D9          >    exx             ;4
+367   0216 7E          >    ld a,(hl)       ;7 read sample from play buffer
+367   0217 73          >    ld (hl),e       ;7 clear play buffer
+367   0218 02          >    ld (bc),a       ;7 play sample
+367   0219 2C          >    inc l           ;4 increment with looping
+367   021A D9          >    exx             ;4=33t
+368   021B 2A F2 08        ld hl,(chnList+10)   ;16
+369   021E 7C              ld a,h              ;4
+370   021F B5              or l                ;4
+371   0220 C2 2D 02        jp nz,ch2Setup      ;10
+372   0223 ED 7B E2 08     ld sp,(emptyOff)    ;20-+-A
+373   0227 3A E1 08        ld a,(emptyBank)    ;13 |
+374   022A C3 37 02        jp ch2SetOK         ;10-+
+375   022D             ch2Setup
+376   022D 21 F0 08        ld hl,chnList+8     ;10-+-B
+377   0230 66              ld h,(hl)           ;7  |
+378   0231 2E 00           ld l,0              ;7  |
+379   0233 F9              ld sp,hl            ;6  |
+380   0234 3A F1 08        ld a,(chnList+9)    ;13-+
+381   0237             ch2SetOK
+382   0237 08              ex af,af            ;4
+383   0238                 delay110t           ;=224t
+383   0238 01 06 00    >    ld bc,6         ;10
+383   023B 0D          >    dec c           ;4
+383   023C C2 3B 02    >    jp nz,$-1       ;10
+383   023F 01 00 00    >    ld bc,0         ;10
+383   0242 03          >    inc bc          ;6=110t
+384   0243             
+385   0243                 IFDEF DEBUG
+386   0243~                ld a,'B'
+387   0243~                ld (#1fe0),a
+388   0243                 ENDIF
+389   0243             
+390   0243             ;93
+391   0243                 ;select bank, while playing 1 sample
+392   0243                 sampleOutput        ;33t
+392   0243 D9          >    exx             ;4
+392   0244 7E          >    ld a,(hl)       ;7 read sample from play buffer
+392   0245 73          >    ld (hl),e       ;7 clear play buffer
+392   0246 02          >    ld (bc),a       ;7 play sample
+392   0247 2C          >    inc l           ;4 increment with looping
+392   0248 D9          >    exx             ;4=33t
+393   0249 08              ex af,af            ;4
+394   024A                 bankSwitch          ;97t
+394   024A 21 00 60    >    ld hl,#6000 ;10
+394   024D 77          >    ld (hl),a   ;7
+394   024E 1F          >    rra         ;4
+394   024F 77          >    ld (hl),a   ;7
+394   0250 1F          >    rra         ;4
+394   0251 77          >    ld (hl),a   ;7
+394   0252 1F          >    rra         ;4
+394   0253 77          >    ld (hl),a   ;7
+394   0254 1F          >    rra         ;4
+394   0255 77          >    ld (hl),a   ;7
+394   0256 1F          >    rra         ;4
+394   0257 77          >    ld (hl),a   ;7
+394   0258 1F          >    rra         ;4
+394   0259 77          >    ld (hl),a   ;7
+394   025A 3E 01       >    ld a, 1
+394   025C 77          >    ld (hl), a
+394   025D 77          >    ld (hl), a
+394   025E 75          >    ld (hl),l   ;7
+394   025F 75          >    ld (hl),l   ;7=97t
+395   0260                 delay67t            ;67t
+395   0260 DD CB 00 46 >    bit 0,(ix)      ;20
+395   0264 DD CB 00 46 >    bit 0,(ix)      ;20
+395   0268 DD CB 00 46 >    bit 0,(ix)      ;20
+395   026C 0E 00       >    ld c,0          ;7=67t
+396   026E 2A E4 08        ld hl,(bufWrite)    ;16
+397   0271                                     ;=224-7t, see below
+398   0271              
+399   0271                 IFDEF DEBUG
+400   0271~                ld a,'C'
+401   0271~                ld (#1fe0),a
+402   0271                 ENDIF
+403   0271              
+404   0271             ;94
+405   0271                 ;read and mix 252 bytes, while playing 42 samples
+406   0271 06 2A           ld b,42             ;7 taken from ^^^
+407   0273             ch2Render
+408   0273                 sampleOutput        ;33t
+408   0273 D9          >    exx             ;4
+408   0274 7E          >    ld a,(hl)       ;7 read sample from play buffer
+408   0275 73          >    ld (hl),e       ;7 clear play buffer
+408   0276 02          >    ld (bc),a       ;7 play sample
+408   0277 2C          >    inc l           ;4 increment with looping
+408   0278 D9          >    exx             ;4=33t
+409   0279                 readAndMix
+409   0279 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+409   027A 7B          >    ld a,e      ;4
+409   027B 86          >    add a,(hl)  ;7
+409   027C 77          >    ld (hl),a   ;7
+409   027D 2C          >    inc l       ;4
+409   027E 7A          >    ld a,d      ;4
+409   027F 86          >    add a,(hl)  ;7
+409   0280 77          >    ld (hl),a   ;7
+409   0281 2C          >    inc l       ;4=56t
+410   0282                 readAndMix
+410   0282 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+410   0283 7B          >    ld a,e      ;4
+410   0284 86          >    add a,(hl)  ;7
+410   0285 77          >    ld (hl),a   ;7
+410   0286 2C          >    inc l       ;4
+410   0287 7A          >    ld a,d      ;4
+410   0288 86          >    add a,(hl)  ;7
+410   0289 77          >    ld (hl),a   ;7
+410   028A 2C          >    inc l       ;4=56t
+411   028B                 readAndMix          ;3*56=168t
+411   028B D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+411   028C 7B          >    ld a,e      ;4
+411   028D 86          >    add a,(hl)  ;7
+411   028E 77          >    ld (hl),a   ;7
+411   028F 2C          >    inc l       ;4
+411   0290 7A          >    ld a,d      ;4
+411   0291 86          >    add a,(hl)  ;7
+411   0292 77          >    ld (hl),a   ;7
+411   0293 2C          >    inc l       ;4=56t
+412   0294                 delay9t             ;9t
+412   0294 ED 5F       >    ld a,r          ;9t
+413   0296 05              dec b               ;4
+414   0297 C2 73 02        jp nz,ch2Render     ;10
+415   029A                                     ;=224t
+416   029A              
+417   029A                 IFDEF DEBUG
+418   029A~                ld a,'D'
+419   029A~                ld (#1fe0),a
+420   029A                 ENDIF
+421   029A              
+422   029A             ;136
+423   029A                 ;read and mix last 4 bytes, while playing 1 sample
+424   029A                 sampleOutput        ;33t
+424   029A D9          >    exx             ;4
+424   029B 7E          >    ld a,(hl)       ;7 read sample from play buffer
+424   029C 73          >    ld (hl),e       ;7 clear play buffer
+424   029D 02          >    ld (bc),a       ;7 play sample
+424   029E 2C          >    inc l           ;4 increment with looping
+424   029F D9          >    exx             ;4=33t
+425   02A0                 readAndMix
+425   02A0 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+425   02A1 7B          >    ld a,e      ;4
+425   02A2 86          >    add a,(hl)  ;7
+425   02A3 77          >    ld (hl),a   ;7
+425   02A4 2C          >    inc l       ;4
+425   02A5 7A          >    ld a,d      ;4
+425   02A6 86          >    add a,(hl)  ;7
+425   02A7 77          >    ld (hl),a   ;7
+425   02A8 2C          >    inc l       ;4=56t
+426   02A9                 readAndMix          ;2*56=112t
+426   02A9 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+426   02AA 7B          >    ld a,e      ;4
+426   02AB 86          >    add a,(hl)  ;7
+426   02AC 77          >    ld (hl),a   ;7
+426   02AD 2C          >    inc l       ;4
+426   02AE 7A          >    ld a,d      ;4
+426   02AF 86          >    add a,(hl)  ;7
+426   02B0 77          >    ld (hl),a   ;7
+426   02B1 2C          >    inc l       ;4=56t
+427   02B2                 delay79t            ;=224t
+427   02B2 06 04       >    ld b,4          ;7
+427   02B4 05          >    dec b           ;4
+427   02B5 C2 B4 02    >    jp nz,$-1       ;10
+427   02B8 00          >    nop             ;4
+427   02B9 00          >    nop             ;4
+427   02BA 00          >    nop             ;4
+427   02BB 00          >    nop             ;4=79t
+428   02BC              
+429   02BC                 IFDEF DEBUG
+430   02BC~                ld a,'E'
+431   02BC~                ld (#1fe0),a
+432   02BC                 ENDIF
+433   02BC              
+434   02BC             ;137
+435   02BC                 ;update sample position and check for sample end, while playing 1 sample
+436   02BC                 sampleOutput        ;33t
+436   02BC D9          >    exx             ;4
+436   02BD 7E          >    ld a,(hl)       ;7 read sample from play buffer
+436   02BE 73          >    ld (hl),e       ;7 clear play buffer
+436   02BF 02          >    ld (bc),a       ;7 play sample
+436   02C0 2C          >    inc l           ;4 increment with looping
+436   02C1 D9          >    exx             ;4=33t
+437   02C2              
+438   02C2 21 F0 08        ld hl,chnList+8     ;10
+439   02C5 34              inc (hl)            ;11
+440   02C6 7E              ld a,(hl)           ;7
+441   02C7 23              inc hl              ;6
+442   02C8 B7              or a                ;4
+443   02C9 C2 D2 02        jp nz,ch2BankNoInc  ;10
+444   02CC 3E 80           ld a,#80            ;7 -+-A
+445   02CE 34              inc (hl)            ;11 |
+446   02CF C3 DA 02        jp ch2OffsetWr      ;10-+
+447   02D2             ch2BankNoInc
+448   02D2 06 00           ld b,0              ;7 -+-B
+449   02D4 06 00           ld b,0              ;7  |
+450   02D6 40              ld b,b              ;4  |
+451   02D7 C3 DA 02        jp $+3              ;10-+
+452   02DA             ch2OffsetWr
+453   02DA 2B              dec hl              ;6
+454   02DB 77              ld (hl),a           ;7
+455   02DC 2A F2 08        ld hl,(chnList+10)   ;16
+456   02DF 7C              ld a,h              ;4
+457   02E0 B5              or l                ;4
+458   02E1 CA E8 02        jp z,ch2LenNoInc    ;10
+459   02E4 2B              dec hl              ;6 -+-A
+460   02E5 C3 EC 02        jp ch2LenWr         ;10-+
+461   02E8             ch2LenNoInc
+462   02E8 0B              dec bc              ;6 -+-B
+463   02E9 C3 EC 02        jp $+3              ;10-+
+464   02EC             ch2LenWr
+465   02EC 22 F2 08        ld (chnList+10),hl   ;16
+466   02EF                 delay36t            ;=224t
+466   02EF DD CB 00 46 >    bit 0,(ix)      ;20
+466   02F3 01 00 00    >    ld bc,0         ;10
+466   02F6 03          >    inc bc          ;6=36t
+467   02F7              
+468   02F7                 IFDEF DEBUG
+469   02F7~                ld a,'F'
+470   02F7~                ld (#1fe0),a
+471   02F7                 ENDIF
+472   02F7              
+473   02F7                 ;process channel #3
+474   02F7             ;138
+475   02F7                 ;set SP to offset, while playing 1 sample
+476   02F7                 sampleOutput        ;33t
+476   02F7 D9          >    exx             ;4
+476   02F8 7E          >    ld a,(hl)       ;7 read sample from play buffer
+476   02F9 73          >    ld (hl),e       ;7 clear play buffer
+476   02FA 02          >    ld (bc),a       ;7 play sample
+476   02FB 2C          >    inc l           ;4 increment with looping
+476   02FC D9          >    exx             ;4=33t
+477   02FD 2A F6 08        ld hl,(chnList+14)   ;16
+478   0300 7C              ld a,h              ;4
+479   0301 B5              or l                ;4
+480   0302 C2 0F 03        jp nz,ch3Setup      ;10
+481   0305 ED 7B E2 08     ld sp,(emptyOff)    ;20-+-A
+482   0309 3A E1 08        ld a,(emptyBank)    ;13 |
+483   030C C3 19 03        jp ch3SetOK         ;10-+
+484   030F             ch3Setup
+485   030F 21 F4 08        ld hl,chnList+12    ;10-+-B
+486   0312 66              ld h,(hl)           ;7  |
+487   0313 2E 00           ld l,0              ;7  |
+488   0315 F9              ld sp,hl            ;6  |
+489   0316 3A F5 08        ld a,(chnList+13)   ;13-+
+490   0319             ch3SetOK
+491   0319 08              ex af,af            ;4
+492   031A                 delay110t           ;=224t
+492   031A 01 06 00    >    ld bc,6         ;10
+492   031D 0D          >    dec c           ;4
+492   031E C2 1D 03    >    jp nz,$-1       ;10
+492   0321 01 00 00    >    ld bc,0         ;10
+492   0324 03          >    inc bc          ;6=110t
+493   0325             
+494   0325                 IFDEF DEBUG
+495   0325~                ld a,'G'
+496   0325~                ld (#1fe0),a
+497   0325                 ENDIF
+498   0325              
+499   0325             ;139
+500   0325                 ;select bank, while playing 1 sample
+501   0325                 sampleOutput        ;33t
+501   0325 D9          >    exx             ;4
+501   0326 7E          >    ld a,(hl)       ;7 read sample from play buffer
+501   0327 73          >    ld (hl),e       ;7 clear play buffer
+501   0328 02          >    ld (bc),a       ;7 play sample
+501   0329 2C          >    inc l           ;4 increment with looping
+501   032A D9          >    exx             ;4=33t
+502   032B 08              ex af,af            ;4
+503   032C                 bankSwitch          ;97t
+503   032C 21 00 60    >    ld hl,#6000 ;10
+503   032F 77          >    ld (hl),a   ;7
+503   0330 1F          >    rra         ;4
+503   0331 77          >    ld (hl),a   ;7
+503   0332 1F          >    rra         ;4
+503   0333 77          >    ld (hl),a   ;7
+503   0334 1F          >    rra         ;4
+503   0335 77          >    ld (hl),a   ;7
+503   0336 1F          >    rra         ;4
+503   0337 77          >    ld (hl),a   ;7
+503   0338 1F          >    rra         ;4
+503   0339 77          >    ld (hl),a   ;7
+503   033A 1F          >    rra         ;4
+503   033B 77          >    ld (hl),a   ;7
+503   033C 3E 01       >    ld a, 1
+503   033E 77          >    ld (hl), a
+503   033F 77          >    ld (hl), a
+503   0340 75          >    ld (hl),l   ;7
+503   0341 75          >    ld (hl),l   ;7=97t
+504   0342                 delay67t            ;67t
+504   0342 DD CB 00 46 >    bit 0,(ix)      ;20
+504   0346 DD CB 00 46 >    bit 0,(ix)      ;20
+504   034A DD CB 00 46 >    bit 0,(ix)      ;20
+504   034E 0E 00       >    ld c,0          ;7=67t
+505   0350 2A E4 08        ld hl,(bufWrite)    ;16
+506   0353                                     ;=224-7t, see below
+507   0353              
+508   0353                 IFDEF DEBUG
+509   0353~                ld a,'H'
+510   0353~                ld (#1fe0),a
+511   0353                 ENDIF
+512   0353              
+513   0353             ;140
+514   0353                 ;read and mix 252 bytes, while playing 42 samples
+515   0353 06 2A           ld b,42             ;7 taken from ^^^
+516   0355             ch3Render
+517   0355                 sampleOutput        ;33t
+517   0355 D9          >    exx             ;4
+517   0356 7E          >    ld a,(hl)       ;7 read sample from play buffer
+517   0357 73          >    ld (hl),e       ;7 clear play buffer
+517   0358 02          >    ld (bc),a       ;7 play sample
+517   0359 2C          >    inc l           ;4 increment with looping
+517   035A D9          >    exx             ;4=33t
+518   035B                 readAndMix
+518   035B D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+518   035C 7B          >    ld a,e      ;4
+518   035D 86          >    add a,(hl)  ;7
+518   035E 77          >    ld (hl),a   ;7
+518   035F 2C          >    inc l       ;4
+518   0360 7A          >    ld a,d      ;4
+518   0361 86          >    add a,(hl)  ;7
+518   0362 77          >    ld (hl),a   ;7
+518   0363 2C          >    inc l       ;4=56t
+519   0364                 readAndMix
+519   0364 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+519   0365 7B          >    ld a,e      ;4
+519   0366 86          >    add a,(hl)  ;7
+519   0367 77          >    ld (hl),a   ;7
+519   0368 2C          >    inc l       ;4
+519   0369 7A          >    ld a,d      ;4
+519   036A 86          >    add a,(hl)  ;7
+519   036B 77          >    ld (hl),a   ;7
+519   036C 2C          >    inc l       ;4=56t
+520   036D                 readAndMix          ;3*56=168t
+520   036D D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+520   036E 7B          >    ld a,e      ;4
+520   036F 86          >    add a,(hl)  ;7
+520   0370 77          >    ld (hl),a   ;7
+520   0371 2C          >    inc l       ;4
+520   0372 7A          >    ld a,d      ;4
+520   0373 86          >    add a,(hl)  ;7
+520   0374 77          >    ld (hl),a   ;7
+520   0375 2C          >    inc l       ;4=56t
+521   0376                 delay9t             ;9t
+521   0376 ED 5F       >    ld a,r          ;9t
+522   0378 05              dec b               ;4
+523   0379 C2 55 03        jp nz,ch3Render     ;10
+524   037C                                     ;=224t
+525   037C              
+526   037C                 IFDEF DEBUG
+527   037C~                ld a,'I'
+528   037C~                ld (#1fe0),a
+529   037C                 ENDIF
+530   037C              
+531   037C             ;182
+532   037C                 ;read and mix last 4 bytes, while playing 1 sample
+533   037C                 sampleOutput        ;33t
+533   037C D9          >    exx             ;4
+533   037D 7E          >    ld a,(hl)       ;7 read sample from play buffer
+533   037E 73          >    ld (hl),e       ;7 clear play buffer
+533   037F 02          >    ld (bc),a       ;7 play sample
+533   0380 2C          >    inc l           ;4 increment with looping
+533   0381 D9          >    exx             ;4=33t
+534   0382                 readAndMix
+534   0382 D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+534   0383 7B          >    ld a,e      ;4
+534   0384 86          >    add a,(hl)  ;7
+534   0385 77          >    ld (hl),a   ;7
+534   0386 2C          >    inc l       ;4
+534   0387 7A          >    ld a,d      ;4
+534   0388 86          >    add a,(hl)  ;7
+534   0389 77          >    ld (hl),a   ;7
+534   038A 2C          >    inc l       ;4=56t
+535   038B                 readAndMix          ;2*56=112t
+535   038B D1          >    pop de      ;12 (because wait in ROM, not sure for exact time)
+535   038C 7B          >    ld a,e      ;4
+535   038D 86          >    add a,(hl)  ;7
+535   038E 77          >    ld (hl),a   ;7
+535   038F 2C          >    inc l       ;4
+535   0390 7A          >    ld a,d      ;4
+535   0391 86          >    add a,(hl)  ;7
+535   0392 77          >    ld (hl),a   ;7
+535   0393 2C          >    inc l       ;4=56t
+536   0394                 delay79t            ;=224t
+536   0394 06 04       >    ld b,4          ;7
+536   0396 05          >    dec b           ;4
+536   0397 C2 96 03    >    jp nz,$-1       ;10
+536   039A 00          >    nop             ;4
+536   039B 00          >    nop             ;4
+536   039C 00          >    nop             ;4
+536   039D 00          >    nop             ;4=79t
+537   039E              
+538   039E                 IFDEF DEBUG
+539   039E~                ld a,'J'
+540   039E~                ld (#1fe0),a
+541   039E                 ENDIF
+542   039E              
+543   039E             ;183
+544   039E                 ;update sample position and check for sample end, while playing 1 sample
+545   039E                 sampleOutput        ;33t
+545   039E D9          >    exx             ;4
+545   039F 7E          >    ld a,(hl)       ;7 read sample from play buffer
+545   03A0 73          >    ld (hl),e       ;7 clear play buffer
+545   03A1 02          >    ld (bc),a       ;7 play sample
+545   03A2 2C          >    inc l           ;4 increment with looping
+545   03A3 D9          >    exx             ;4=33t
+546   03A4              
+547   03A4 21 F4 08        ld hl,chnList+12    ;10
+548   03A7 34              inc (hl)            ;11
+549   03A8 7E              ld a,(hl)           ;7
+550   03A9 23              inc hl              ;6
+551   03AA B7              or a                ;4
+552   03AB C2 B4 03        jp nz,ch3BankNoInc  ;10
+553   03AE 3E 80           ld a,#80            ;7 -+-A
+554   03B0 34              inc (hl)            ;11 |
+555   03B1 C3 BC 03        jp ch3OffsetWr      ;10-+
+556   03B4             ch3BankNoInc
+557   03B4 06 00           ld b,0              ;7 -+-B
+558   03B6 06 00           ld b,0              ;7  |
+559   03B8 40              ld b,b              ;4  |
+560   03B9 C3 BC 03        jp $+3              ;10-+
+561   03BC             ch3OffsetWr
+562   03BC 2B              dec hl              ;6
+563   03BD 77              ld (hl),a           ;7
+564   03BE 2A F6 08        ld hl,(chnList+14)  ;16
+565   03C1 7C              ld a,h              ;4
+566   03C2 B5              or l                ;4
+567   03C3 CA CA 03        jp z,ch3LenNoInc    ;10
+568   03C6 2B              dec hl              ;6 -+-A
+569   03C7 C3 CE 03        jp ch3LenWr         ;10-+
+570   03CA             ch3LenNoInc
+571   03CA 0B              dec bc              ;6 -+-B
+572   03CB C3 CE 03        jp $+3              ;10-+
+573   03CE             ch3LenWr
+574   03CE 22 F6 08        ld (chnList+14),hl  ;16
+575   03D1                 delay36t            ;=224t
+575   03D1 DD CB 00 46 >    bit 0,(ix)      ;20
+575   03D5 01 00 00    >    ld bc,0         ;10
+575   03D8 03          >    inc bc          ;6=36t
+576   03D9              
+577   03D9              
+578   03D9                 IFDEF DEBUG
+579   03D9~                ld a,'K'
+580   03D9~                ld (#1fe0),a
+581   03D9                 ENDIF
+582   03D9              
+583   03D9             ;184
+584   03D9                 ;play all other samples-3 without work in background
+585   03D9                 ;so there is some free time
+586   03D9                 REPT 68
+587   03D9~                sampleOutput        ;33t
+588   03D9~                delay191t           ;191t
+589   03D9                 ENDM                ;=224t
+589   03D9 D9          >    exx             ;4
+589   03DA 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   03DB 73          >    ld (hl),e       ;7 clear play buffer
+589   03DC 02          >    ld (bc),a       ;7 play sample
+589   03DD 2C          >    inc l           ;4 increment with looping
+589   03DE D9          >    exx             ;4=33t
+589   03DF 0E 0C       >    ld c,12         ;7
+589   03E1 0D          >    dec c           ;4
+589   03E2 C2 E1 03    >    jp nz,$-1       ;10
+589   03E5 2A 00 00    >    ld hl,(0)       ;16=191t
+589   03E8 D9          >    exx             ;4
+589   03E9 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   03EA 73          >    ld (hl),e       ;7 clear play buffer
+589   03EB 02          >    ld (bc),a       ;7 play sample
+589   03EC 2C          >    inc l           ;4 increment with looping
+589   03ED D9          >    exx             ;4=33t
+589   03EE 0E 0C       >    ld c,12         ;7
+589   03F0 0D          >    dec c           ;4
+589   03F1 C2 F0 03    >    jp nz,$-1       ;10
+589   03F4 2A 00 00    >    ld hl,(0)       ;16=191t
+589   03F7 D9          >    exx             ;4
+589   03F8 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   03F9 73          >    ld (hl),e       ;7 clear play buffer
+589   03FA 02          >    ld (bc),a       ;7 play sample
+589   03FB 2C          >    inc l           ;4 increment with looping
+589   03FC D9          >    exx             ;4=33t
+589   03FD 0E 0C       >    ld c,12         ;7
+589   03FF 0D          >    dec c           ;4
+589   0400 C2 FF 03    >    jp nz,$-1       ;10
+589   0403 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0406 D9          >    exx             ;4
+589   0407 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0408 73          >    ld (hl),e       ;7 clear play buffer
+589   0409 02          >    ld (bc),a       ;7 play sample
+589   040A 2C          >    inc l           ;4 increment with looping
+589   040B D9          >    exx             ;4=33t
+589   040C 0E 0C       >    ld c,12         ;7
+589   040E 0D          >    dec c           ;4
+589   040F C2 0E 04    >    jp nz,$-1       ;10
+589   0412 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0415 D9          >    exx             ;4
+589   0416 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0417 73          >    ld (hl),e       ;7 clear play buffer
+589   0418 02          >    ld (bc),a       ;7 play sample
+589   0419 2C          >    inc l           ;4 increment with looping
+589   041A D9          >    exx             ;4=33t
+589   041B 0E 0C       >    ld c,12         ;7
+589   041D 0D          >    dec c           ;4
+589   041E C2 1D 04    >    jp nz,$-1       ;10
+589   0421 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0424 D9          >    exx             ;4
+589   0425 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0426 73          >    ld (hl),e       ;7 clear play buffer
+589   0427 02          >    ld (bc),a       ;7 play sample
+589   0428 2C          >    inc l           ;4 increment with looping
+589   0429 D9          >    exx             ;4=33t
+589   042A 0E 0C       >    ld c,12         ;7
+589   042C 0D          >    dec c           ;4
+589   042D C2 2C 04    >    jp nz,$-1       ;10
+589   0430 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0433 D9          >    exx             ;4
+589   0434 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0435 73          >    ld (hl),e       ;7 clear play buffer
+589   0436 02          >    ld (bc),a       ;7 play sample
+589   0437 2C          >    inc l           ;4 increment with looping
+589   0438 D9          >    exx             ;4=33t
+589   0439 0E 0C       >    ld c,12         ;7
+589   043B 0D          >    dec c           ;4
+589   043C C2 3B 04    >    jp nz,$-1       ;10
+589   043F 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0442 D9          >    exx             ;4
+589   0443 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0444 73          >    ld (hl),e       ;7 clear play buffer
+589   0445 02          >    ld (bc),a       ;7 play sample
+589   0446 2C          >    inc l           ;4 increment with looping
+589   0447 D9          >    exx             ;4=33t
+589   0448 0E 0C       >    ld c,12         ;7
+589   044A 0D          >    dec c           ;4
+589   044B C2 4A 04    >    jp nz,$-1       ;10
+589   044E 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0451 D9          >    exx             ;4
+589   0452 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0453 73          >    ld (hl),e       ;7 clear play buffer
+589   0454 02          >    ld (bc),a       ;7 play sample
+589   0455 2C          >    inc l           ;4 increment with looping
+589   0456 D9          >    exx             ;4=33t
+589   0457 0E 0C       >    ld c,12         ;7
+589   0459 0D          >    dec c           ;4
+589   045A C2 59 04    >    jp nz,$-1       ;10
+589   045D 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0460 D9          >    exx             ;4
+589   0461 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0462 73          >    ld (hl),e       ;7 clear play buffer
+589   0463 02          >    ld (bc),a       ;7 play sample
+589   0464 2C          >    inc l           ;4 increment with looping
+589   0465 D9          >    exx             ;4=33t
+589   0466 0E 0C       >    ld c,12         ;7
+589   0468 0D          >    dec c           ;4
+589   0469 C2 68 04    >    jp nz,$-1       ;10
+589   046C 2A 00 00    >    ld hl,(0)       ;16=191t
+589   046F D9          >    exx             ;4
+589   0470 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0471 73          >    ld (hl),e       ;7 clear play buffer
+589   0472 02          >    ld (bc),a       ;7 play sample
+589   0473 2C          >    inc l           ;4 increment with looping
+589   0474 D9          >    exx             ;4=33t
+589   0475 0E 0C       >    ld c,12         ;7
+589   0477 0D          >    dec c           ;4
+589   0478 C2 77 04    >    jp nz,$-1       ;10
+589   047B 2A 00 00    >    ld hl,(0)       ;16=191t
+589   047E D9          >    exx             ;4
+589   047F 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0480 73          >    ld (hl),e       ;7 clear play buffer
+589   0481 02          >    ld (bc),a       ;7 play sample
+589   0482 2C          >    inc l           ;4 increment with looping
+589   0483 D9          >    exx             ;4=33t
+589   0484 0E 0C       >    ld c,12         ;7
+589   0486 0D          >    dec c           ;4
+589   0487 C2 86 04    >    jp nz,$-1       ;10
+589   048A 2A 00 00    >    ld hl,(0)       ;16=191t
+589   048D D9          >    exx             ;4
+589   048E 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   048F 73          >    ld (hl),e       ;7 clear play buffer
+589   0490 02          >    ld (bc),a       ;7 play sample
+589   0491 2C          >    inc l           ;4 increment with looping
+589   0492 D9          >    exx             ;4=33t
+589   0493 0E 0C       >    ld c,12         ;7
+589   0495 0D          >    dec c           ;4
+589   0496 C2 95 04    >    jp nz,$-1       ;10
+589   0499 2A 00 00    >    ld hl,(0)       ;16=191t
+589   049C D9          >    exx             ;4
+589   049D 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   049E 73          >    ld (hl),e       ;7 clear play buffer
+589   049F 02          >    ld (bc),a       ;7 play sample
+589   04A0 2C          >    inc l           ;4 increment with looping
+589   04A1 D9          >    exx             ;4=33t
+589   04A2 0E 0C       >    ld c,12         ;7
+589   04A4 0D          >    dec c           ;4
+589   04A5 C2 A4 04    >    jp nz,$-1       ;10
+589   04A8 2A 00 00    >    ld hl,(0)       ;16=191t
+589   04AB D9          >    exx             ;4
+589   04AC 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   04AD 73          >    ld (hl),e       ;7 clear play buffer
+589   04AE 02          >    ld (bc),a       ;7 play sample
+589   04AF 2C          >    inc l           ;4 increment with looping
+589   04B0 D9          >    exx             ;4=33t
+589   04B1 0E 0C       >    ld c,12         ;7
+589   04B3 0D          >    dec c           ;4
+589   04B4 C2 B3 04    >    jp nz,$-1       ;10
+589   04B7 2A 00 00    >    ld hl,(0)       ;16=191t
+589   04BA D9          >    exx             ;4
+589   04BB 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   04BC 73          >    ld (hl),e       ;7 clear play buffer
+589   04BD 02          >    ld (bc),a       ;7 play sample
+589   04BE 2C          >    inc l           ;4 increment with looping
+589   04BF D9          >    exx             ;4=33t
+589   04C0 0E 0C       >    ld c,12         ;7
+589   04C2 0D          >    dec c           ;4
+589   04C3 C2 C2 04    >    jp nz,$-1       ;10
+589   04C6 2A 00 00    >    ld hl,(0)       ;16=191t
+589   04C9 D9          >    exx             ;4
+589   04CA 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   04CB 73          >    ld (hl),e       ;7 clear play buffer
+589   04CC 02          >    ld (bc),a       ;7 play sample
+589   04CD 2C          >    inc l           ;4 increment with looping
+589   04CE D9          >    exx             ;4=33t
+589   04CF 0E 0C       >    ld c,12         ;7
+589   04D1 0D          >    dec c           ;4
+589   04D2 C2 D1 04    >    jp nz,$-1       ;10
+589   04D5 2A 00 00    >    ld hl,(0)       ;16=191t
+589   04D8 D9          >    exx             ;4
+589   04D9 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   04DA 73          >    ld (hl),e       ;7 clear play buffer
+589   04DB 02          >    ld (bc),a       ;7 play sample
+589   04DC 2C          >    inc l           ;4 increment with looping
+589   04DD D9          >    exx             ;4=33t
+589   04DE 0E 0C       >    ld c,12         ;7
+589   04E0 0D          >    dec c           ;4
+589   04E1 C2 E0 04    >    jp nz,$-1       ;10
+589   04E4 2A 00 00    >    ld hl,(0)       ;16=191t
+589   04E7 D9          >    exx             ;4
+589   04E8 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   04E9 73          >    ld (hl),e       ;7 clear play buffer
+589   04EA 02          >    ld (bc),a       ;7 play sample
+589   04EB 2C          >    inc l           ;4 increment with looping
+589   04EC D9          >    exx             ;4=33t
+589   04ED 0E 0C       >    ld c,12         ;7
+589   04EF 0D          >    dec c           ;4
+589   04F0 C2 EF 04    >    jp nz,$-1       ;10
+589   04F3 2A 00 00    >    ld hl,(0)       ;16=191t
+589   04F6 D9          >    exx             ;4
+589   04F7 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   04F8 73          >    ld (hl),e       ;7 clear play buffer
+589   04F9 02          >    ld (bc),a       ;7 play sample
+589   04FA 2C          >    inc l           ;4 increment with looping
+589   04FB D9          >    exx             ;4=33t
+589   04FC 0E 0C       >    ld c,12         ;7
+589   04FE 0D          >    dec c           ;4
+589   04FF C2 FE 04    >    jp nz,$-1       ;10
+589   0502 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0505 D9          >    exx             ;4
+589   0506 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0507 73          >    ld (hl),e       ;7 clear play buffer
+589   0508 02          >    ld (bc),a       ;7 play sample
+589   0509 2C          >    inc l           ;4 increment with looping
+589   050A D9          >    exx             ;4=33t
+589   050B 0E 0C       >    ld c,12         ;7
+589   050D 0D          >    dec c           ;4
+589   050E C2 0D 05    >    jp nz,$-1       ;10
+589   0511 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0514 D9          >    exx             ;4
+589   0515 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0516 73          >    ld (hl),e       ;7 clear play buffer
+589   0517 02          >    ld (bc),a       ;7 play sample
+589   0518 2C          >    inc l           ;4 increment with looping
+589   0519 D9          >    exx             ;4=33t
+589   051A 0E 0C       >    ld c,12         ;7
+589   051C 0D          >    dec c           ;4
+589   051D C2 1C 05    >    jp nz,$-1       ;10
+589   0520 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0523 D9          >    exx             ;4
+589   0524 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0525 73          >    ld (hl),e       ;7 clear play buffer
+589   0526 02          >    ld (bc),a       ;7 play sample
+589   0527 2C          >    inc l           ;4 increment with looping
+589   0528 D9          >    exx             ;4=33t
+589   0529 0E 0C       >    ld c,12         ;7
+589   052B 0D          >    dec c           ;4
+589   052C C2 2B 05    >    jp nz,$-1       ;10
+589   052F 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0532 D9          >    exx             ;4
+589   0533 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0534 73          >    ld (hl),e       ;7 clear play buffer
+589   0535 02          >    ld (bc),a       ;7 play sample
+589   0536 2C          >    inc l           ;4 increment with looping
+589   0537 D9          >    exx             ;4=33t
+589   0538 0E 0C       >    ld c,12         ;7
+589   053A 0D          >    dec c           ;4
+589   053B C2 3A 05    >    jp nz,$-1       ;10
+589   053E 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0541 D9          >    exx             ;4
+589   0542 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0543 73          >    ld (hl),e       ;7 clear play buffer
+589   0544 02          >    ld (bc),a       ;7 play sample
+589   0545 2C          >    inc l           ;4 increment with looping
+589   0546 D9          >    exx             ;4=33t
+589   0547 0E 0C       >    ld c,12         ;7
+589   0549 0D          >    dec c           ;4
+589   054A C2 49 05    >    jp nz,$-1       ;10
+589   054D 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0550 D9          >    exx             ;4
+589   0551 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0552 73          >    ld (hl),e       ;7 clear play buffer
+589   0553 02          >    ld (bc),a       ;7 play sample
+589   0554 2C          >    inc l           ;4 increment with looping
+589   0555 D9          >    exx             ;4=33t
+589   0556 0E 0C       >    ld c,12         ;7
+589   0558 0D          >    dec c           ;4
+589   0559 C2 58 05    >    jp nz,$-1       ;10
+589   055C 2A 00 00    >    ld hl,(0)       ;16=191t
+589   055F D9          >    exx             ;4
+589   0560 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0561 73          >    ld (hl),e       ;7 clear play buffer
+589   0562 02          >    ld (bc),a       ;7 play sample
+589   0563 2C          >    inc l           ;4 increment with looping
+589   0564 D9          >    exx             ;4=33t
+589   0565 0E 0C       >    ld c,12         ;7
+589   0567 0D          >    dec c           ;4
+589   0568 C2 67 05    >    jp nz,$-1       ;10
+589   056B 2A 00 00    >    ld hl,(0)       ;16=191t
+589   056E D9          >    exx             ;4
+589   056F 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0570 73          >    ld (hl),e       ;7 clear play buffer
+589   0571 02          >    ld (bc),a       ;7 play sample
+589   0572 2C          >    inc l           ;4 increment with looping
+589   0573 D9          >    exx             ;4=33t
+589   0574 0E 0C       >    ld c,12         ;7
+589   0576 0D          >    dec c           ;4
+589   0577 C2 76 05    >    jp nz,$-1       ;10
+589   057A 2A 00 00    >    ld hl,(0)       ;16=191t
+589   057D D9          >    exx             ;4
+589   057E 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   057F 73          >    ld (hl),e       ;7 clear play buffer
+589   0580 02          >    ld (bc),a       ;7 play sample
+589   0581 2C          >    inc l           ;4 increment with looping
+589   0582 D9          >    exx             ;4=33t
+589   0583 0E 0C       >    ld c,12         ;7
+589   0585 0D          >    dec c           ;4
+589   0586 C2 85 05    >    jp nz,$-1       ;10
+589   0589 2A 00 00    >    ld hl,(0)       ;16=191t
+589   058C D9          >    exx             ;4
+589   058D 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   058E 73          >    ld (hl),e       ;7 clear play buffer
+589   058F 02          >    ld (bc),a       ;7 play sample
+589   0590 2C          >    inc l           ;4 increment with looping
+589   0591 D9          >    exx             ;4=33t
+589   0592 0E 0C       >    ld c,12         ;7
+589   0594 0D          >    dec c           ;4
+589   0595 C2 94 05    >    jp nz,$-1       ;10
+589   0598 2A 00 00    >    ld hl,(0)       ;16=191t
+589   059B D9          >    exx             ;4
+589   059C 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   059D 73          >    ld (hl),e       ;7 clear play buffer
+589   059E 02          >    ld (bc),a       ;7 play sample
+589   059F 2C          >    inc l           ;4 increment with looping
+589   05A0 D9          >    exx             ;4=33t
+589   05A1 0E 0C       >    ld c,12         ;7
+589   05A3 0D          >    dec c           ;4
+589   05A4 C2 A3 05    >    jp nz,$-1       ;10
+589   05A7 2A 00 00    >    ld hl,(0)       ;16=191t
+589   05AA D9          >    exx             ;4
+589   05AB 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   05AC 73          >    ld (hl),e       ;7 clear play buffer
+589   05AD 02          >    ld (bc),a       ;7 play sample
+589   05AE 2C          >    inc l           ;4 increment with looping
+589   05AF D9          >    exx             ;4=33t
+589   05B0 0E 0C       >    ld c,12         ;7
+589   05B2 0D          >    dec c           ;4
+589   05B3 C2 B2 05    >    jp nz,$-1       ;10
+589   05B6 2A 00 00    >    ld hl,(0)       ;16=191t
+589   05B9 D9          >    exx             ;4
+589   05BA 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   05BB 73          >    ld (hl),e       ;7 clear play buffer
+589   05BC 02          >    ld (bc),a       ;7 play sample
+589   05BD 2C          >    inc l           ;4 increment with looping
+589   05BE D9          >    exx             ;4=33t
+589   05BF 0E 0C       >    ld c,12         ;7
+589   05C1 0D          >    dec c           ;4
+589   05C2 C2 C1 05    >    jp nz,$-1       ;10
+589   05C5 2A 00 00    >    ld hl,(0)       ;16=191t
+589   05C8 D9          >    exx             ;4
+589   05C9 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   05CA 73          >    ld (hl),e       ;7 clear play buffer
+589   05CB 02          >    ld (bc),a       ;7 play sample
+589   05CC 2C          >    inc l           ;4 increment with looping
+589   05CD D9          >    exx             ;4=33t
+589   05CE 0E 0C       >    ld c,12         ;7
+589   05D0 0D          >    dec c           ;4
+589   05D1 C2 D0 05    >    jp nz,$-1       ;10
+589   05D4 2A 00 00    >    ld hl,(0)       ;16=191t
+589   05D7 D9          >    exx             ;4
+589   05D8 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   05D9 73          >    ld (hl),e       ;7 clear play buffer
+589   05DA 02          >    ld (bc),a       ;7 play sample
+589   05DB 2C          >    inc l           ;4 increment with looping
+589   05DC D9          >    exx             ;4=33t
+589   05DD 0E 0C       >    ld c,12         ;7
+589   05DF 0D          >    dec c           ;4
+589   05E0 C2 DF 05    >    jp nz,$-1       ;10
+589   05E3 2A 00 00    >    ld hl,(0)       ;16=191t
+589   05E6 D9          >    exx             ;4
+589   05E7 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   05E8 73          >    ld (hl),e       ;7 clear play buffer
+589   05E9 02          >    ld (bc),a       ;7 play sample
+589   05EA 2C          >    inc l           ;4 increment with looping
+589   05EB D9          >    exx             ;4=33t
+589   05EC 0E 0C       >    ld c,12         ;7
+589   05EE 0D          >    dec c           ;4
+589   05EF C2 EE 05    >    jp nz,$-1       ;10
+589   05F2 2A 00 00    >    ld hl,(0)       ;16=191t
+589   05F5 D9          >    exx             ;4
+589   05F6 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   05F7 73          >    ld (hl),e       ;7 clear play buffer
+589   05F8 02          >    ld (bc),a       ;7 play sample
+589   05F9 2C          >    inc l           ;4 increment with looping
+589   05FA D9          >    exx             ;4=33t
+589   05FB 0E 0C       >    ld c,12         ;7
+589   05FD 0D          >    dec c           ;4
+589   05FE C2 FD 05    >    jp nz,$-1       ;10
+589   0601 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0604 D9          >    exx             ;4
+589   0605 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0606 73          >    ld (hl),e       ;7 clear play buffer
+589   0607 02          >    ld (bc),a       ;7 play sample
+589   0608 2C          >    inc l           ;4 increment with looping
+589   0609 D9          >    exx             ;4=33t
+589   060A 0E 0C       >    ld c,12         ;7
+589   060C 0D          >    dec c           ;4
+589   060D C2 0C 06    >    jp nz,$-1       ;10
+589   0610 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0613 D9          >    exx             ;4
+589   0614 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0615 73          >    ld (hl),e       ;7 clear play buffer
+589   0616 02          >    ld (bc),a       ;7 play sample
+589   0617 2C          >    inc l           ;4 increment with looping
+589   0618 D9          >    exx             ;4=33t
+589   0619 0E 0C       >    ld c,12         ;7
+589   061B 0D          >    dec c           ;4
+589   061C C2 1B 06    >    jp nz,$-1       ;10
+589   061F 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0622 D9          >    exx             ;4
+589   0623 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0624 73          >    ld (hl),e       ;7 clear play buffer
+589   0625 02          >    ld (bc),a       ;7 play sample
+589   0626 2C          >    inc l           ;4 increment with looping
+589   0627 D9          >    exx             ;4=33t
+589   0628 0E 0C       >    ld c,12         ;7
+589   062A 0D          >    dec c           ;4
+589   062B C2 2A 06    >    jp nz,$-1       ;10
+589   062E 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0631 D9          >    exx             ;4
+589   0632 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0633 73          >    ld (hl),e       ;7 clear play buffer
+589   0634 02          >    ld (bc),a       ;7 play sample
+589   0635 2C          >    inc l           ;4 increment with looping
+589   0636 D9          >    exx             ;4=33t
+589   0637 0E 0C       >    ld c,12         ;7
+589   0639 0D          >    dec c           ;4
+589   063A C2 39 06    >    jp nz,$-1       ;10
+589   063D 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0640 D9          >    exx             ;4
+589   0641 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0642 73          >    ld (hl),e       ;7 clear play buffer
+589   0643 02          >    ld (bc),a       ;7 play sample
+589   0644 2C          >    inc l           ;4 increment with looping
+589   0645 D9          >    exx             ;4=33t
+589   0646 0E 0C       >    ld c,12         ;7
+589   0648 0D          >    dec c           ;4
+589   0649 C2 48 06    >    jp nz,$-1       ;10
+589   064C 2A 00 00    >    ld hl,(0)       ;16=191t
+589   064F D9          >    exx             ;4
+589   0650 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0651 73          >    ld (hl),e       ;7 clear play buffer
+589   0652 02          >    ld (bc),a       ;7 play sample
+589   0653 2C          >    inc l           ;4 increment with looping
+589   0654 D9          >    exx             ;4=33t
+589   0655 0E 0C       >    ld c,12         ;7
+589   0657 0D          >    dec c           ;4
+589   0658 C2 57 06    >    jp nz,$-1       ;10
+589   065B 2A 00 00    >    ld hl,(0)       ;16=191t
+589   065E D9          >    exx             ;4
+589   065F 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0660 73          >    ld (hl),e       ;7 clear play buffer
+589   0661 02          >    ld (bc),a       ;7 play sample
+589   0662 2C          >    inc l           ;4 increment with looping
+589   0663 D9          >    exx             ;4=33t
+589   0664 0E 0C       >    ld c,12         ;7
+589   0666 0D          >    dec c           ;4
+589   0667 C2 66 06    >    jp nz,$-1       ;10
+589   066A 2A 00 00    >    ld hl,(0)       ;16=191t
+589   066D D9          >    exx             ;4
+589   066E 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   066F 73          >    ld (hl),e       ;7 clear play buffer
+589   0670 02          >    ld (bc),a       ;7 play sample
+589   0671 2C          >    inc l           ;4 increment with looping
+589   0672 D9          >    exx             ;4=33t
+589   0673 0E 0C       >    ld c,12         ;7
+589   0675 0D          >    dec c           ;4
+589   0676 C2 75 06    >    jp nz,$-1       ;10
+589   0679 2A 00 00    >    ld hl,(0)       ;16=191t
+589   067C D9          >    exx             ;4
+589   067D 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   067E 73          >    ld (hl),e       ;7 clear play buffer
+589   067F 02          >    ld (bc),a       ;7 play sample
+589   0680 2C          >    inc l           ;4 increment with looping
+589   0681 D9          >    exx             ;4=33t
+589   0682 0E 0C       >    ld c,12         ;7
+589   0684 0D          >    dec c           ;4
+589   0685 C2 84 06    >    jp nz,$-1       ;10
+589   0688 2A 00 00    >    ld hl,(0)       ;16=191t
+589   068B D9          >    exx             ;4
+589   068C 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   068D 73          >    ld (hl),e       ;7 clear play buffer
+589   068E 02          >    ld (bc),a       ;7 play sample
+589   068F 2C          >    inc l           ;4 increment with looping
+589   0690 D9          >    exx             ;4=33t
+589   0691 0E 0C       >    ld c,12         ;7
+589   0693 0D          >    dec c           ;4
+589   0694 C2 93 06    >    jp nz,$-1       ;10
+589   0697 2A 00 00    >    ld hl,(0)       ;16=191t
+589   069A D9          >    exx             ;4
+589   069B 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   069C 73          >    ld (hl),e       ;7 clear play buffer
+589   069D 02          >    ld (bc),a       ;7 play sample
+589   069E 2C          >    inc l           ;4 increment with looping
+589   069F D9          >    exx             ;4=33t
+589   06A0 0E 0C       >    ld c,12         ;7
+589   06A2 0D          >    dec c           ;4
+589   06A3 C2 A2 06    >    jp nz,$-1       ;10
+589   06A6 2A 00 00    >    ld hl,(0)       ;16=191t
+589   06A9 D9          >    exx             ;4
+589   06AA 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   06AB 73          >    ld (hl),e       ;7 clear play buffer
+589   06AC 02          >    ld (bc),a       ;7 play sample
+589   06AD 2C          >    inc l           ;4 increment with looping
+589   06AE D9          >    exx             ;4=33t
+589   06AF 0E 0C       >    ld c,12         ;7
+589   06B1 0D          >    dec c           ;4
+589   06B2 C2 B1 06    >    jp nz,$-1       ;10
+589   06B5 2A 00 00    >    ld hl,(0)       ;16=191t
+589   06B8 D9          >    exx             ;4
+589   06B9 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   06BA 73          >    ld (hl),e       ;7 clear play buffer
+589   06BB 02          >    ld (bc),a       ;7 play sample
+589   06BC 2C          >    inc l           ;4 increment with looping
+589   06BD D9          >    exx             ;4=33t
+589   06BE 0E 0C       >    ld c,12         ;7
+589   06C0 0D          >    dec c           ;4
+589   06C1 C2 C0 06    >    jp nz,$-1       ;10
+589   06C4 2A 00 00    >    ld hl,(0)       ;16=191t
+589   06C7 D9          >    exx             ;4
+589   06C8 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   06C9 73          >    ld (hl),e       ;7 clear play buffer
+589   06CA 02          >    ld (bc),a       ;7 play sample
+589   06CB 2C          >    inc l           ;4 increment with looping
+589   06CC D9          >    exx             ;4=33t
+589   06CD 0E 0C       >    ld c,12         ;7
+589   06CF 0D          >    dec c           ;4
+589   06D0 C2 CF 06    >    jp nz,$-1       ;10
+589   06D3 2A 00 00    >    ld hl,(0)       ;16=191t
+589   06D6 D9          >    exx             ;4
+589   06D7 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   06D8 73          >    ld (hl),e       ;7 clear play buffer
+589   06D9 02          >    ld (bc),a       ;7 play sample
+589   06DA 2C          >    inc l           ;4 increment with looping
+589   06DB D9          >    exx             ;4=33t
+589   06DC 0E 0C       >    ld c,12         ;7
+589   06DE 0D          >    dec c           ;4
+589   06DF C2 DE 06    >    jp nz,$-1       ;10
+589   06E2 2A 00 00    >    ld hl,(0)       ;16=191t
+589   06E5 D9          >    exx             ;4
+589   06E6 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   06E7 73          >    ld (hl),e       ;7 clear play buffer
+589   06E8 02          >    ld (bc),a       ;7 play sample
+589   06E9 2C          >    inc l           ;4 increment with looping
+589   06EA D9          >    exx             ;4=33t
+589   06EB 0E 0C       >    ld c,12         ;7
+589   06ED 0D          >    dec c           ;4
+589   06EE C2 ED 06    >    jp nz,$-1       ;10
+589   06F1 2A 00 00    >    ld hl,(0)       ;16=191t
+589   06F4 D9          >    exx             ;4
+589   06F5 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   06F6 73          >    ld (hl),e       ;7 clear play buffer
+589   06F7 02          >    ld (bc),a       ;7 play sample
+589   06F8 2C          >    inc l           ;4 increment with looping
+589   06F9 D9          >    exx             ;4=33t
+589   06FA 0E 0C       >    ld c,12         ;7
+589   06FC 0D          >    dec c           ;4
+589   06FD C2 FC 06    >    jp nz,$-1       ;10
+589   0700 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0703 D9          >    exx             ;4
+589   0704 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0705 73          >    ld (hl),e       ;7 clear play buffer
+589   0706 02          >    ld (bc),a       ;7 play sample
+589   0707 2C          >    inc l           ;4 increment with looping
+589   0708 D9          >    exx             ;4=33t
+589   0709 0E 0C       >    ld c,12         ;7
+589   070B 0D          >    dec c           ;4
+589   070C C2 0B 07    >    jp nz,$-1       ;10
+589   070F 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0712 D9          >    exx             ;4
+589   0713 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0714 73          >    ld (hl),e       ;7 clear play buffer
+589   0715 02          >    ld (bc),a       ;7 play sample
+589   0716 2C          >    inc l           ;4 increment with looping
+589   0717 D9          >    exx             ;4=33t
+589   0718 0E 0C       >    ld c,12         ;7
+589   071A 0D          >    dec c           ;4
+589   071B C2 1A 07    >    jp nz,$-1       ;10
+589   071E 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0721 D9          >    exx             ;4
+589   0722 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0723 73          >    ld (hl),e       ;7 clear play buffer
+589   0724 02          >    ld (bc),a       ;7 play sample
+589   0725 2C          >    inc l           ;4 increment with looping
+589   0726 D9          >    exx             ;4=33t
+589   0727 0E 0C       >    ld c,12         ;7
+589   0729 0D          >    dec c           ;4
+589   072A C2 29 07    >    jp nz,$-1       ;10
+589   072D 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0730 D9          >    exx             ;4
+589   0731 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0732 73          >    ld (hl),e       ;7 clear play buffer
+589   0733 02          >    ld (bc),a       ;7 play sample
+589   0734 2C          >    inc l           ;4 increment with looping
+589   0735 D9          >    exx             ;4=33t
+589   0736 0E 0C       >    ld c,12         ;7
+589   0738 0D          >    dec c           ;4
+589   0739 C2 38 07    >    jp nz,$-1       ;10
+589   073C 2A 00 00    >    ld hl,(0)       ;16=191t
+589   073F D9          >    exx             ;4
+589   0740 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0741 73          >    ld (hl),e       ;7 clear play buffer
+589   0742 02          >    ld (bc),a       ;7 play sample
+589   0743 2C          >    inc l           ;4 increment with looping
+589   0744 D9          >    exx             ;4=33t
+589   0745 0E 0C       >    ld c,12         ;7
+589   0747 0D          >    dec c           ;4
+589   0748 C2 47 07    >    jp nz,$-1       ;10
+589   074B 2A 00 00    >    ld hl,(0)       ;16=191t
+589   074E D9          >    exx             ;4
+589   074F 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   0750 73          >    ld (hl),e       ;7 clear play buffer
+589   0751 02          >    ld (bc),a       ;7 play sample
+589   0752 2C          >    inc l           ;4 increment with looping
+589   0753 D9          >    exx             ;4=33t
+589   0754 0E 0C       >    ld c,12         ;7
+589   0756 0D          >    dec c           ;4
+589   0757 C2 56 07    >    jp nz,$-1       ;10
+589   075A 2A 00 00    >    ld hl,(0)       ;16=191t
+589   075D D9          >    exx             ;4
+589   075E 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   075F 73          >    ld (hl),e       ;7 clear play buffer
+589   0760 02          >    ld (bc),a       ;7 play sample
+589   0761 2C          >    inc l           ;4 increment with looping
+589   0762 D9          >    exx             ;4=33t
+589   0763 0E 0C       >    ld c,12         ;7
+589   0765 0D          >    dec c           ;4
+589   0766 C2 65 07    >    jp nz,$-1       ;10
+589   0769 2A 00 00    >    ld hl,(0)       ;16=191t
+589   076C D9          >    exx             ;4
+589   076D 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   076E 73          >    ld (hl),e       ;7 clear play buffer
+589   076F 02          >    ld (bc),a       ;7 play sample
+589   0770 2C          >    inc l           ;4 increment with looping
+589   0771 D9          >    exx             ;4=33t
+589   0772 0E 0C       >    ld c,12         ;7
+589   0774 0D          >    dec c           ;4
+589   0775 C2 74 07    >    jp nz,$-1       ;10
+589   0778 2A 00 00    >    ld hl,(0)       ;16=191t
+589   077B D9          >    exx             ;4
+589   077C 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   077D 73          >    ld (hl),e       ;7 clear play buffer
+589   077E 02          >    ld (bc),a       ;7 play sample
+589   077F 2C          >    inc l           ;4 increment with looping
+589   0780 D9          >    exx             ;4=33t
+589   0781 0E 0C       >    ld c,12         ;7
+589   0783 0D          >    dec c           ;4
+589   0784 C2 83 07    >    jp nz,$-1       ;10
+589   0787 2A 00 00    >    ld hl,(0)       ;16=191t
+589   078A D9          >    exx             ;4
+589   078B 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   078C 73          >    ld (hl),e       ;7 clear play buffer
+589   078D 02          >    ld (bc),a       ;7 play sample
+589   078E 2C          >    inc l           ;4 increment with looping
+589   078F D9          >    exx             ;4=33t
+589   0790 0E 0C       >    ld c,12         ;7
+589   0792 0D          >    dec c           ;4
+589   0793 C2 92 07    >    jp nz,$-1       ;10
+589   0796 2A 00 00    >    ld hl,(0)       ;16=191t
+589   0799 D9          >    exx             ;4
+589   079A 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   079B 73          >    ld (hl),e       ;7 clear play buffer
+589   079C 02          >    ld (bc),a       ;7 play sample
+589   079D 2C          >    inc l           ;4 increment with looping
+589   079E D9          >    exx             ;4=33t
+589   079F 0E 0C       >    ld c,12         ;7
+589   07A1 0D          >    dec c           ;4
+589   07A2 C2 A1 07    >    jp nz,$-1       ;10
+589   07A5 2A 00 00    >    ld hl,(0)       ;16=191t
+589   07A8 D9          >    exx             ;4
+589   07A9 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   07AA 73          >    ld (hl),e       ;7 clear play buffer
+589   07AB 02          >    ld (bc),a       ;7 play sample
+589   07AC 2C          >    inc l           ;4 increment with looping
+589   07AD D9          >    exx             ;4=33t
+589   07AE 0E 0C       >    ld c,12         ;7
+589   07B0 0D          >    dec c           ;4
+589   07B1 C2 B0 07    >    jp nz,$-1       ;10
+589   07B4 2A 00 00    >    ld hl,(0)       ;16=191t
+589   07B7 D9          >    exx             ;4
+589   07B8 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   07B9 73          >    ld (hl),e       ;7 clear play buffer
+589   07BA 02          >    ld (bc),a       ;7 play sample
+589   07BB 2C          >    inc l           ;4 increment with looping
+589   07BC D9          >    exx             ;4=33t
+589   07BD 0E 0C       >    ld c,12         ;7
+589   07BF 0D          >    dec c           ;4
+589   07C0 C2 BF 07    >    jp nz,$-1       ;10
+589   07C3 2A 00 00    >    ld hl,(0)       ;16=191t
+589   07C6 D9          >    exx             ;4
+589   07C7 7E          >    ld a,(hl)       ;7 read sample from play buffer
+589   07C8 73          >    ld (hl),e       ;7 clear play buffer
+589   07C9 02          >    ld (bc),a       ;7 play sample
+589   07CA 2C          >    inc l           ;4 increment with looping
+589   07CB D9          >    exx             ;4=33t
+589   07CC 0E 0C       >    ld c,12         ;7
+589   07CE 0D          >    dec c           ;4
+589   07CF C2 CE 07    >    jp nz,$-1       ;10
+589   07D2 2A 00 00    >    ld hl,(0)       ;16=191t
+590   07D5              
+591   07D5                 IFDEF DEBUG
+592   07D5~                ld a,'L'
+593   07D5~                ld (#1fe0),a
+594   07D5                 ENDIF
+595   07D5              
+596   07D5             ;252
+597   07D5                 ;switch buffers and check for new sound while playing 1 sample
+598   07D5                 sampleOutput        ;33t
+598   07D5 D9          >    exx             ;4
+598   07D6 7E          >    ld a,(hl)       ;7 read sample from play buffer
+598   07D7 73          >    ld (hl),e       ;7 clear play buffer
+598   07D8 02          >    ld (bc),a       ;7 play sample
+598   07D9 2C          >    inc l           ;4 increment with looping
+598   07DA D9          >    exx             ;4=33t
+599   07DB             
+600   07DB 2A E4 08        ld hl,(bufWrite)    ;16
+601   07DE ED 5B E6 08     ld de,(bufPlay)     ;20
+602   07E2 ED 53 E4 08     ld (bufWrite),de    ;20
+603   07E6 22 E6 08        ld (bufPlay),hl     ;16
+604   07E9 D9              exx                 ;4
+605   07EA 2A E6 08        ld hl,(bufPlay)     ;16
+606   07ED D9              exx                 ;4=96
+607   07EE              
+608   07EE                 delay68t            ;68t
+608   07EE DD CB 00 46 >    bit 0,(ix)      ;20
+608   07F2 DD CB 00 46 >    bit 0,(ix)      ;20
+608   07F6 DD CB 00 46 >    bit 0,(ix)      ;20
+608   07FA 00          >    nop             ;4
+608   07FB 00          >    nop             ;4=68t
+609   07FC              
+610   07FC 3A F0 1F        ld a,(#1ff0)        ;13
+611   07FF B7              or a                ;4
+612   0800 CA A4 08        jp z,noNewSample    ;10
+613   0803              
+614   0803                 IFDEF DEBUG
+615   0803~                ld a,'M'
+616   0803~                ld (#1fe0),a
+617   0803                 ENDIF
+618   0803              
+619   0803             ;253
+620   0803                 ;search new channel and write parameters while playing 3 samples
+621   0803                 sampleOutput        ;33t
+621   0803 D9          >    exx             ;4
+621   0804 7E          >    ld a,(hl)       ;7 read sample from play buffer
+621   0805 73          >    ld (hl),e       ;7 clear play buffer
+621   0806 02          >    ld (bc),a       ;7 play sample
+621   0807 2C          >    inc l           ;4 increment with looping
+621   0808 D9          >    exx             ;4=33t
+622   0809              
+623   0809 2A EA 08        ld hl,(chnList+2)   ;16
+624   080C ED 5B EE 08     ld de,(chnList+6)   ;20
+625   0810 01 E8 08        ld bc,chnList       ;10
+626   0813 7C              ld a,h              ;4
+627   0814 BA              cp d                ;4
+628   0815 DA 24 08        jp c,selCh0ls0      ;10
+629   0818 7D              ld a,l              ;4 -+-A0
+630   0819 BB              cp e                ;4 -+
+631   081A DA 26 08        jp c,selCh0ls1      ;10
+632   081D 01 EC 08        ld bc,chnList+4     ;10-+-A1
+633   0820 EB              ex de,hl            ;4  |
+634   0821 C3 3F 08        jp selCh2Check      ;10-+
+635   0824             selCh0ls0
+636   0824 00              nop                 ;4 -+-B0
+637   0825 00              nop                 ;4 -+
+638   0826             selCh0ls1
+639   0826 00              nop                 ;4 -+-B1
+640   0827 C3 2A 08        jp $+3              ;10 |
+641   082A C3 2D 08        jp $+3              ;10-+
+642   082D              
+643   082D                 delay85t            ;33+106+85=224t
+643   082D 11 04 00    >    ld de,4         ;10
+643   0830 1D          >    dec e           ;4
+643   0831 C2 30 08    >    jp nz,$-1       ;10
+643   0834 1E 00       >    ld e,0          ;7
+643   0836 00          >    nop             ;4
+643   0837 00          >    nop             ;4
+643   0838 00          >    nop             ;4=85t
+644   0839              
+645   0839                 IFDEF DEBUG
+646   0839~                ld a,'N'
+647   0839~                ld (#1fe0),a
+648   0839                 ENDIF
+649   0839              
+650   0839             ;254
+651   0839                 sampleOutput        ;33t
+651   0839 D9          >    exx             ;4
+651   083A 7E          >    ld a,(hl)       ;7 read sample from play buffer
+651   083B 73          >    ld (hl),e       ;7 clear play buffer
+651   083C 02          >    ld (bc),a       ;7 play sample
+651   083D 2C          >    inc l           ;4 increment with looping
+651   083E D9          >    exx             ;4=33t
+652   083F              
+653   083F             selCh2Check
+654   083F ED 5B F2 08     ld de,(chnList+10)  ;20
+655   0843 7C              ld a,h              ;4
+656   0844 BA              cp d                ;4
+657   0845 DA 54 08        jp c,selCh2ls0      ;10
+658   0848 7D              ld a,l              ;4 -+-A0
+659   0849 BB              cp e                ;4 -+
+660   084A DA 56 08        jp c,selCh2ls1      ;10
+661   084D 01 F0 08        ld bc,chnList+8     ;10-+-A1
+662   0850 EB              ex de,hl            ;4  |
+663   0851 C3 6A 08        jp selCh3Check      ;10-+
+664   0854             selCh2ls0
+665   0854 00              nop                 ;4 -+-B0
+666   0855 00              nop                 ;4 -+
+667   0856             selCh2ls1
+668   0856 00              nop                 ;4 -+-B1
+669   0857 C3 5A 08        jp $+3              ;10 |
+670   085A C3 5D 08        jp $+3              ;10-+
+671   085D             
+672   085D                 delay111t           ;33+80+111=224t
+672   085D 16 07       >    ld d,7          ;7
+672   085F 15          >    dec d           ;4
+672   0860 C2 5F 08    >    jp nz,$-1       ;10
+672   0863 13          >    inc de          ;6=111t
+673   0864              
+674   0864                 IFDEF DEBUG
+675   0864~                ld a,'O'
+676   0864~                ld (#1fe0),a
+677   0864                 ENDIF
+678   0864              
+679   0864             ;255
+680   0864                 sampleOutput        ;33t
+680   0864 D9          >    exx             ;4
+680   0865 7E          >    ld a,(hl)       ;7 read sample from play buffer
+680   0866 73          >    ld (hl),e       ;7 clear play buffer
+680   0867 02          >    ld (bc),a       ;7 play sample
+680   0868 2C          >    inc l           ;4 increment with looping
+680   0869 D9          >    exx             ;4=33t
+681   086A              
+682   086A             selCh3Check
+683   086A ED 5B F6 08     ld de,(chnList+14)  ;20
+684   086E 7C              ld a,h              ;4
+685   086F BA              cp d                ;4
+686   0870 DA 7F 08        jp c,selCh3ls0      ;10
+687   0873 7D              ld a,l              ;4 -+-A0
+688   0874 BB              cp e                ;4 -+
+689   0875 DA 81 08        jp c,selCh3ls1      ;10
+690   0878 01 F4 08        ld bc,chnList+12    ;10-+-A1
+691   087B EB              ex de,hl            ;4  |
+692   087C C3 88 08        jp selCheckOK       ;10-+
+693   087F             selCh3ls0
+694   087F 00              nop                 ;4 -+-B0
+695   0880 00              nop                 ;4 -+
+696   0881             selCh3ls1
+697   0881 00              nop                 ;4 -+-B1
+698   0882 C3 85 08        jp $+3              ;10 |
+699   0885 C3 88 08        jp $+3              ;10-+
+700   0888                                     ;=80t
+701   0888              
+702   0888                 IFDEF DEBUG
+703   0888~                ld a,'P'
+704   0888~                ld (#1fe0),a
+705   0888                 ENDIF
+706   0888              
+707   0888             selCheckOK
+708   0888 60              ld h,b              ;4
+709   0889 69              ld l,c              ;4
+710   088A 3A F2 1F        ld a,(#1ff2)        ;13 bank offset
+711   088D 77              ld (hl),a           ;7
+712   088E 23              inc hl              ;6
+713   088F 3A F1 1F        ld a,(#1ff1)        ;13 bank number
+714   0892 77              ld (hl),a           ;7
+715   0893 23              inc hl              ;6
+716   0894 ED 4B F3 1F     ld bc,(#1ff3)       ;13 sample length (in 256-byte blocks)
+717   0898 71              ld (hl),c           ;7
+718   0899 23              inc hl              ;6
+719   089A 70              ld (hl),b           ;7
+720   089B AF              xor a               ;4
+721   089C 32 F0 1F        ld (#1ff0),a        ;13 acknowledge new sound
+722   089F              
+723   089F                 delay9t             ;9t
+723   089F ED 5F       >    ld a,r          ;9t
+724   08A1              
+725   08A1                 IFDEF DEBUG
+726   08A1~                ld a,'Q'
+727   08A1~                ld (#1fe0),a
+728   08A1                 ENDIF
+729   08A1              
+730   08A1 C3 51 00        jp mainLoop         ;10
+731   08A4             
+732   08A4             
+733   08A4             
+734   08A4             noNewSample
+735   08A4             
+736   08A4             ;253
+737   08A4                 IFDEF DEBUG
+738   08A4~                ld a,'R'
+739   08A4~                ld (#1fe0),a
+740   08A4                 ENDIF
+741   08A4              
+742   08A4                 ;no new sound, just play 3 samples
+743   08A4                 sampleOutput        ;33t
+743   08A4 D9          >    exx             ;4
+743   08A5 7E          >    ld a,(hl)       ;7 read sample from play buffer
+743   08A6 73          >    ld (hl),e       ;7 clear play buffer
+743   08A7 02          >    ld (bc),a       ;7 play sample
+743   08A8 2C          >    inc l           ;4 increment with looping
+743   08A9 D9          >    exx             ;4=33t
+744   08AA                 delay191t           ;191t
+744   08AA 0E 0C       >    ld c,12         ;7
+744   08AC 0D          >    dec c           ;4
+744   08AD C2 AC 08    >    jp nz,$-1       ;10
+744   08B0 2A 00 00    >    ld hl,(0)       ;16=191t
+745   08B3              
+746   08B3                 IFDEF DEBUG
+747   08B3~                ld a,'S'
+748   08B3~                ld (#1fe0),a
+749   08B3                 ENDIF
+750   08B3              
+751   08B3             ;254
+752   08B3                 sampleOutput        ;33t
+752   08B3 D9          >    exx             ;4
+752   08B4 7E          >    ld a,(hl)       ;7 read sample from play buffer
+752   08B5 73          >    ld (hl),e       ;7 clear play buffer
+752   08B6 02          >    ld (bc),a       ;7 play sample
+752   08B7 2C          >    inc l           ;4 increment with looping
+752   08B8 D9          >    exx             ;4=33t
+753   08B9                 delay191t           ;191t
+753   08B9 0E 0C       >    ld c,12         ;7
+753   08BB 0D          >    dec c           ;4
+753   08BC C2 BB 08    >    jp nz,$-1       ;10
+753   08BF 2A 00 00    >    ld hl,(0)       ;16=191t
+754   08C2              
+755   08C2                 IFDEF DEBUG
+756   08C2~                ld a,'T'
+757   08C2~                ld (#1fe0),a
+758   08C2                 ENDIF
+759   08C2              
+760   08C2             ;255
+761   08C2                 sampleOutput        ;33t
+761   08C2 D9          >    exx             ;4
+761   08C3 7E          >    ld a,(hl)       ;7 read sample from play buffer
+761   08C4 73          >    ld (hl),e       ;7 clear play buffer
+761   08C5 02          >    ld (bc),a       ;7 play sample
+761   08C6 2C          >    inc l           ;4 increment with looping
+761   08C7 D9          >    exx             ;4=33t
+762   08C8                 delay181t           ;181t
+762   08C8 0E 0C       >    ld c,12         ;7
+762   08CA 0D          >    dec c           ;4
+762   08CB C2 CA 08    >    jp nz,$-1       ;10
+762   08CE 03          >    inc bc          ;6=181t
+763   08CF              
+764   08CF                 IFDEF DEBUG
+765   08CF~                ld a,'U'
+766   08CF~                ld (#1fe0),a
+767   08CF                 ENDIF
+768   08CF              
+769   08CF C3 51 00        jp mainLoop         ;10t
+770   08D2              
+771   08D2             
+772   08D2             
+773   08D2             
+774   08D2              
+775   08D2             ;write word to YM2612 port A
+776   08D2             
+777   08D2             wrYmPortA
+778   08D2 21 00 40        ld hl,#4000
+779   08D5             .wait0
+780   08D5 CB 7E           bit 7,(hl)
+781   08D7 20 FC           jr nz,.wait0
+782   08D9 72              ld (hl),d
+783   08DA             .wait1
+784   08DA CB 7E           bit 7,(hl)
+785   08DC 20 FC           jr nz,.wait1
+786   08DE 2C              inc l
+787   08DF 73              ld (hl),e
+788   08E0 C9              ret
+789   08E1              
+790   08E1              
+791   08E1              
+792   08E1             ;variables
+793   08E1              
+794   08E1 00          emptyBank   DB 0    ;ROM bank where empty buffer is placed
+795   08E2 00 00       emptyOff    DW 0    ;offset of empty buffer
+796   08E4             
+797   08E4 00 00       bufWrite    DW 0    ;addr. of buffer for mix (256-byte aligned)
+798   08E6 00 00       bufPlay     DW 0    ;addr. of buffer for play (256-byte aligned)
+799   08E8             
+800   08E8 10          chnList     DB 4*4  ;+0     byte    offset in bank (MSB only)
+801   08E9                                 ;+1     byte    bank number (0..127)
+802   08E9                                 ;+2     word    length in 256-byte blocks
+803   08E9                                 ;               channel is free when length=0
+804   08E9              
+805   08E9             
+806   08E9              
+807   08E9             
+808   08E9                 org ($/256+1)*256   ;256-byte align
+809   0900              
+810   0900 00          mixBuffer0  DS 256
+811   0A00 00          mixBuffer1  DS 256

@@ -1,0 +1,24 @@
+# sp01c.spt, scrolly demo
+
+	TALK OFF
+	CLEARTEXT
+	CLS
+
+	# Reset scroll
+	SCROLL_SET 0
+
+	# Set image 0 in this cluster as scrolly bg
+	SCROLL_BG 0
+
+	# Start a slowish scroll
+	# 34 means 34-32 = 3 frames per pixel.
+	# Notation trick: /N means N/8. Useful...
+	# This is the same as SCROLL_TO 24, 34
+	SCROLL_TO /192, 34
+
+	# This doesn't interrupt the execution. 
+	# display text meanwhile
+	TALK "XINKSS"
+	TW "THIS IS SOME TEXT BEING DISPLAYED WHILE THE SCROLLY IS DOING ITS JOB... ONCE YOU CLICK, THIS IS DONE."
+
+	CHAPTER 0

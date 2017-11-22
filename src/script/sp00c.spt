@@ -1,0 +1,31 @@
+# sp00c.spt, splashy demo
+
+	TALK OFF
+	CLEARTEXT
+	CLS
+
+	TW "THIS IS A BORING, BORING, BORING DEMONSTRATION OF THE VANE ENGINE."
+
+# Play some music
+
+	CDPLAY 2
+
+	FANCY ON
+	CLEARTEXT
+
+	# Display image 0 as background
+	IMAGE 0
+
+	# Load image 1 to cut 1
+	CUT_LOAD 1, 1
+
+	TW "LET ME DISPLAY SOME CUTS"
+
+	CUT_SHOW 1, 5, 5
+	CUT_SHOW 1, 10, 10
+	CUT_SHOW 1, 15, 15
+
+	TW "DONE! JUMP TO CHAPTER 1."
+
+	CHAPTER NEXT
+	

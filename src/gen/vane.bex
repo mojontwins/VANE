@@ -1,0 +1,1247 @@
+'' VANE 0.2 by The Mojon Twins & Relevo
+	option SEGACD PROGRAM
+	option NOLOADFONT
+
+' Use this table to define the base cluster of each chapter in your game
+chaptersBaseClusters:
+	Data 11, 13, 15, 17, 19, 21, 23
+	Data 25, 27, 29, 31, 33, 35, 37
+		
+' Memory map
+
+' &H214700 - 32K For tha sample pool
+' &H21C770 - 128K For the image pool
+' &H23C770 - 80 bytes For menu items
+' &H23C7C0 - 4K For scripts.
+' &H23D7C0 - 8K-128bytes For texts
+' &H23F7C0 - 256 bytes For text buffer.
+' &H23F840 - 32 bytes For current word buffer
+' &H23F860 - 1920 bytes For tilemap
+' &H23FFE0 - 32 bytes For palette
+
+' &HFFFFDC - Sample start
+' &HFFFFE0 - Sample end
+' &HFFFFE4 - chapter title
+' &HFFFFFD - Base cluster
+' &HFFFFFE - Is copied to flag #127, used for specialVal mode.
+' &HFFFFFF - Start from chapter ...
+
+'' Constants
+
+	Const #CLUSTER_CHARSET = 6
+	Const #CLUSTER_CHARSET_PAL = 7
+	Const #CLUSTER_SAMPLES = 6
+
+	Const #PT_IMG = &H21C770
+	Const #PT_MEN = &H23C770
+	Const #PT_SPT = &H23C7C0
+	Const #PT_TXT = &H23D7C0
+	Const #PT_TXB = &H23F740
+	Const #PT_CWB = &H23F840
+	Const #PT_TMB = &H23F860
+	Const #PT_PLB = &H23FFE0
+	Const #SP_BASE = &H214700		' Sample pool base address
+
+	Const #IMG_POOL_SIZE = 122880	' 120K
+	Const #SP_SIZE = 15				' Sample pool size (minus one)
+	
+	Const #SYSFONTBASE = 0
+	Const #IMGPOOLTSBASE = 192
+	
+	Const #TBTS = 25				' Title Bar Text Size
+
+'' Globals
+
+	Global topOfScreen As Integer
+	Global titleBar As Integer
+	Global windowHeight As Integer
+	Global menuBottom As Integer
+	Global menuLeft As Integer
+
+	Global imgOffs&	As Long			' Image offset in bytes inside cluster.
+	Global nextImgOffs&	As Long		' Same, For Next.
+	Global gpP& As Long				' General purpose pointer
+	Global gpW& As Long				' General purpose pointer #2
+	Global sptP& As Long			' Script pointer
+	Global menuOpts As Integer		' Number of menu options
+	Global flags(127) As Integer	' Flags For scripting control
+	Global lastTile As Integer
+	Global cutsPool(7, 1) As Integer ' 0->lastTile, 1->index
+	Global cutsPoolIndex As Integer
+	Global fancy As Integer
+	Global rememberMenuOpt as Integer
+	
+	Global baseCluster as Integer	' Base cluster For chapters.
+	Global specialVal as Integer
+	Global languageMod as Integer	' Add to base cluster + 1 for correct script
+	
+	Global palYadjust As Integer	' Will equal 1 If screen is pal
+
+	Global scroll_pos As Integer	' Current scroll position (pixel)
+	Global scroll_pos_to As Integer	' Scroll destination
+	Global scroll_step As Integer	' Scroll pixel step
+	Global scroll_maxSubstep As Integer ' For < 1 pixel per frame scrolls
+	Global scroll_subctr As Integer
+	
+	Global samplePool&(#SP_SIZE,1) As Long ' Sample pool 0->ini, 1->end
+	Global sampleCur As Integer		' Current sample
+	Global sampleOffset& As Long	' Last sample offset
+	
+	Global doNothing As Integer		' If <> 0, does nothing but decrement this.
+	
+	Global vBlankIntSignal As Integer
+		
+'' Each vBlank...
+
+	On VBLANK Gosub vBlank_controller
+		
+'' Read from communication memory table
+
+	chapterNumber = Peek(&HFFFF20)
+	specialVal = Peek(&HFFFF21)
+	command = Peek(&HFFFF23)
+	nextAddress = PeekInt(&HFFFF24)
+	languageMod = Peek(&HFFFF26)
+	topOfScreen = Peek(&HFFFF27)
+	titleBar = Peek(&HFFFF28)
+	windowHeight = Peek(&HFFFF29) - 1	' URM!!!   <- Corregir esto
+	menuBottom = Peek(&HFFFF2A) + 1		' AW ¿WTF? <- Corregir esto
+	menuLeft = Peek(&HFFFF2B)
+
+'' Load Z80 sample player by Shiru
+
+	Disable Screen
+	Call shiruLoadZ80
+	Enable Screen
+		
+'' Load charset & set palette
+
+	clearAll
+	loadscd #CLUSTER_CHARSET, VRAM, 0, 192, #SYSFONTBASE
+	loadscd #CLUSTER_CHARSET_PAL, POINTER, 0, 32, #PT_IMG
+	For i = 0 To 15
+		Palette PeekInt(#PT_IMG + i + i), 1, i
+	Next i
+
+'' Adjusto For PAL?
+
+	If TvType() = 0 Then
+		palYadjust = 0
+	Else
+		palYadjust = 1
+	End If
+
+'' title bar
+	
+	if (titleBar) = 1 Then
+		SetGFXPlane SCROLL_A
+	
+		DrawTile #SYSFONTBASE + 32 + Pallette(1), 0, palYadjust
+		gpP& = &HFFFEE7
+		For i = 1 To #TBTS
+			DrawTile #SYSFONTBASE + Peek(gpP&) + Pallette(1), i, palYadjust
+			gpP&=gpP& + 1
+		Next i
+		For i = #TBTS + 1 To 39
+			DrawTile #SYSFONTBASE + 32 + Pallette(1), i, palYadjust
+		Next i
+		
+		If specialVal = 1 Then
+			DrawTile #SYSFONTBASE + 14 + Pallette(1), 35, palYadjust
+			DrawTile #SYSFONTBASE + 15 + Pallette(1), 36, palYadjust
+			DrawTile #SYSFONTBASE + 16 + Pallette(1), 37, palYadjust
+			DrawTile #SYSFONTBASE + 17 + Pallette(1), 38, palYadjust
+		End If
+	End If
+	
+'' Scroll set
+
+	SetScrollMode HSCROLL_OVERALL, VSCROLL_OVERALL
+	SetScrollPlane SCROLL_B
+
+'' main loop 
+
+	flags(127) = specialVal
+	
+	rememberMenuOpt = 1
+	Do
+		chapter = chapterNumber
+		fancy = 1
+		Do
+			nextChapter = runChapter(chapter)
+			chapter = nextChapter
+		Loop While chapter < &HFF
+	Loop
+
+' You must define the chapter->base cluster equivalence in CHAPTERS.BEX
+' (which gets included at the end of this file)
+Declare Function selectBaseCluster(chapter As Integer)
+	Reload chaptersBaseClusters
+	For i = 0 To chapter
+		Read res
+	Next i
+	Return res
+End Function
+	
+' Runs a "chapter". A chapter is composed by two clusters, those of
+' numbers baseCluster + chapter * 2 and following.
+' First cluster contains the main script file plus texts
+' Second cluster contains images
+Declare Function runChapter(chapter As Integer)
+	chapterCluster = selectBaseCluster (chapter)
+	
+	menuOpts = 0
+	lastTile = 0
+	cutsPoolIndex = 0
+	nextChapter = 0
+	doNothing = 0
+	
+	showLoading 1	
+	' First two bytes of the script cluster contains the length.
+	' That way we don't waste time.
+	loadscd chapterCluster + 1 + languageMod, ARRAY, 0, scriptLength
+	
+	' First of all, load script.
+	loadscd chapterCluster + 1 + languageMod, POINTER, 2, scriptLength, #PT_SPT
+	showLoading 0
+	
+	showLoading 1
+	' Now find the length of text bit in chunk. Text will start
+	' at scriptLength
+	loadscd chapterCluster + 1 + languageMod, ARRAY, scriptLength, textChunkLength
+
+	' And load up everything in our buffer
+	loadscd chapterCluster + 1 + languageMod, POINTER, scriptLength + 2, textChunkLength, #PT_TXT
+	showLoading 0
+	
+	' Finally, preload all images.
+	showLoading 1
+	loadscd chapterCluster, POINTER, 0, #IMG_POOL_SIZE, #PT_IMG
+	showLoading 0
+	
+	' Now on To the interpreter!
+	
+	' If command = 1 we must run from &HFFFF25-26 and clear command.
+	If command = 1 Then
+		sptP& = #PT_SPT + PeekInt(&HFFFF25)
+		command = 0
+		Poke &HFFFF23, command
+	Else
+		sptP& = #PT_SPT
+	End If
+	
+	scroll_pos = 0
+	scroll_pos_to = 0
+	scroll_step = 0
+	allDone = 0
+	
+	vBlankIntSignal
+	Enable INTERRUPT VBLANK
+	
+	Do While allDone = 0
+		' Listen for signals from the vBlank interrupt...
+		If vBlankIntSignal Then
+			Select Case vBlankIntSignal
+				Case &H01:
+					' Jump to subprogram upon button binding!
+					
+					' Save PC
+					PokeInt &HFFFF25, getIntPart(sptP& - #PT_SPT)
+					
+					' &HFFFFFF has already been poked by the vBlank Interrupt Routine.
+										
+					' Forced exit
+					nextChapter = &HFF
+					allDone = 1
+					Exit Select
+			End Select
+			vBlankIntSignal = 0
+		End If
+	
+		If doNothing > 0 Then
+			Sleep 1
+			doNothing = doNothing - 1
+		Else
+			b = readByte ()
+			Select Case b
+				Case &H01:
+					' image
+					b = readVByte ()
+					'loadImage baseCluster + 1, b
+					loadImageFromMem b, 0, 0, 0, 0, 0
+					Exit Select
+				Case &H02:
+					' cut_load
+					b = readVByte ()
+					c = readVByte ()
+					loadImageFromMem c, 1, b, 0, 0, 0
+					Exit Select
+				Case &H03:
+					' clear
+					lastTile = 0
+					cutsPoolIndex = 0
+					SetGFXPlane SCROLL_B
+					For i = topOfScreen To 24
+						For j = 0 To 39
+							DrawTile 0, j, i + palYadjust
+						Next j
+					Next i
+					Exit Select
+				Case &H04:
+					' cut show
+					b = readVByte ()
+					x = readVByte ()
+					y = readVByte ()
+					loadImageFromMem cutsPool(b, 1), 2, b, x, y, 0
+					Exit Select
+				Case &H05:
+					' fancy on
+					fancy = 1
+					Exit Select
+				Case &H06:
+					' fancy off
+					fancy = 0
+					Exit Select
+				Case &H07:
+					' Scroll_BG
+					b = readVByte ()
+					loadImageFromMem b, 3, 0, 0, 0
+					Exit Select
+				Case &H08:
+					' Restore_BG
+					oldfancy = fancy
+					fancy = 0
+					loadImageFromMem cutsPool (0, 1), 2, 0, 0, 0, 0
+					fancy = oldfancy
+					Exit Select
+				Case &H09:
+					' cut ovl
+					b = readVByte ()
+					x = readVByte ()
+					y = readVByte ()
+					loadImageFromMem cutsPool(b, 1), 2, b, x, y, 1
+					Exit Select
+				Case &H10:
+				Case &H11:
+					' text
+					c = readVByte ()
+					doTextCycle c
+					If b = &H11 Then DoWt
+					Exit Select
+				Case &H1D:
+					' Set sleep counter
+					b = readByte ()
+					doNothing = b << 8
+					doNothing = doNothing + readByte ()
+				Case &H1E:
+					' clear text
+					clrTextArea
+					Exit Select
+				Case &H1F:
+					' wait
+					doWt
+					Exit Select
+				Case &H20:
+					' Clear menu
+					menuOpts = 0
+					Exit Select
+				Case &H21:
+				Case &H22:
+				Case &H23:
+					If b = &H22 Then
+						writeTo = readVByte () - 1
+					Else
+						writeTo = menuOpts
+						If b = &H23 Then flags(readVByte ()) = writeTo + 1
+					End If
+					' Add Item
+					' Copy bytes To menu buffer
+					If menuOpts < 8 Then
+						gpP& = #PT_MEN + (writeTo * 10)
+						For i = 0 To 9
+							c = readByte ()
+							Poke gpP&, c
+							gpP& = gpP& + 1
+						Next i
+						If writeTo >= menuOpts Then
+							menuOpts = writeTo + 1
+						End If
+					End If
+					Exit Select
+				Case &H30:
+				Case &H31:
+				Case &H32:
+				Case &H33:
+					c = readVByte ()
+					d = readVByte ()
+					address& = readAddress&()
+					doCondBranch b, c, d, address&
+					Exit Select
+				Case &H3F:
+					' GOTO
+					jumpToAddress readAddress&()
+					Exit Select
+				Case &H40:
+					' LET
+					a = readVByte ()
+					b = readVByte ()
+					flags(a) = b
+					Exit Select
+				Case &H50:
+					' Do menu
+					flags(0) = doMenu ()
+					Exit Select
+				Case &H60:
+					' Talk
+					SetGFXPlane SCROLL_A
+					DrawTile #SYSFONTBASE + 32 + Pallette(1), 0, 27 - 1 - windowHeight + palYadjust
+					DrawTile #SYSFONTBASE + 03 + Pallette(1), 0, 27 - 2 - windowHeight + palYadjust
+					For i = 1 To 10
+						b = readByte ()
+						DrawTile #SYSFONTBASE + Pallette(1) + b, i, 27 - 1 - windowHeight + palYadjust
+						DrawTile #SYSFONTBASE + 03 + Pallette(1), i, 27 - 2 - windowHeight + palYadjust
+					Next i
+					DrawTile #SYSFONTBASE + 03 + Pallette(1), 11, 27 - 2 - windowHeight + palYadjust
+					DrawTile #SYSFONTBASE + 32 + Pallette(1), 11, 27 - 1 - windowHeight + palYadjust
+					DrawTile #SYSFONTBASE + 11 + Pallette(1), 12, 27 - 2 - windowHeight + palYadjust
+					DrawTile #SYSFONTBASE + 12 + Pallette(1), 12, 27 - 1 - windowHeight + palYadjust
+					For i = 13 To 39
+						DrawTile Pallette(1) + #SYSFONTBASE + 03, i, 27 - 1 - windowHeight + palYadjust
+					Next i
+					Exit Select
+				Case &H61:
+					' Talk Off
+					' Prepare some stuff
+					SetGFXPlane SCROLL_A
+					For i = 0 To 39
+						DrawTile 0, i, 27 - 2 - windowHeight
+						DrawTile Pallette(1) + #SYSFONTBASE + 03, i, 27 - 1 - windowHeight + palYadjust
+					Next i
+					Exit Select
+				Case &H70:
+					' CD Play
+					b = readVByte ()
+					Cdplay2 b
+					Exit Select
+				Case &H71:
+					' CD Stop
+					Cdstop
+					Exit Select
+				Case &H72:
+					' CD Pause
+					Cdpause
+					Exit Select
+				Case &H73:
+					' CD Unpause
+					Cdunpause
+					Exit Select
+				Case &H80:
+					' CLR
+					b = readVByte ()
+					niceCls b
+					Exit Select
+				Case &H88:
+					' SCROLL_SET TILE_POS
+					b = readByte ()
+					scroll_pos = b << 3
+					scroll_pos_to = scroll_pos
+					scroll_step = 0
+					scroll_subctr = 0
+					ScrollHTo scroll_pos
+					Exit Select
+				Case &H89:
+					' SCROLL_TO LSB STEP
+					b = readByte ()
+					scroll_pos_to = b << 3
+					b = readVbyte ()
+					If b <= 32 Then 
+						scroll_step = b
+						scroll_maxSubstep = 0
+					Else
+						scroll_step = 1
+						scroll_maxSubstep = b - 32
+					End If
+					scroll_subctr = 0
+					Exit Select
+				Case &H90:
+					' INC
+					b = readVByte ()
+					flags(b) = flags(b) + 1
+					Exit Select
+				Case &H91:
+					' DEC
+					b = readVByte ()
+					flags(b) = flags(b) - 1
+					Exit Select
+				Case &HA0:
+					' CLEAR_SAMPLES
+					sampleCur = 0
+					sampleOffset& = #SP_BASE
+					Exit Select
+				Case &HA1:
+					' ADD_SAMPLE
+					b = readVByte ()
+					sampleAdd (b)
+					Exit Select
+				Case &HA2:
+					' PLAY_SAMPLE
+					b = readByte ()
+					sampleStart& = samplePool& (b, 0)
+					sampleEnd& = samplePool& (b, 1)
+					samplePlay sampleStart&, sampleEnd&
+					Exit Select
+				Case &HE0:
+					' SET N=A
+					b = readByte ()
+					Poke &HFFFF00 + b, readByte ()
+					Exit Select
+				Case &HE1:
+					' RUN_SLOT N
+					b = readByte ()
+					
+					' First save current PC...
+					PokeInt &HFFFF25, getIntPart(sptP& - #PT_SPT)
+					
+					' Jump to slot at &HFFFF00 + b
+					' If slot is "0" (does not exist) it attempts to load the menu.
+					' If menu does not exist, it will load VANE.SCD from chapter 0.
+					
+					b = Peek(&HFFFF00 + b)
+										
+					If b <> 0 Then
+						Poke &HFFFFFF, b
+					Else
+						If Peek(&HFFFF00) <> 0 Then
+							Poke &HFFFFFF, Peek(&HFFFF00)
+						Else
+							Poke &HFFFF20, 0
+							Poke &HFFFFFF, Peek(&HFFFF01)
+						End If
+					End If
+					
+					' Forced exit
+					nextChapter = &HFF
+					allDone = 1
+					
+					Exit Select
+				Case &HFB:
+					nextChapter = readVByte ()
+					allDone = 1
+					Exit Select
+				Case &HFC:
+					nextChapter = chapter
+					allDone = 1
+					Exit Select
+				Case &HFD:
+					nextChapter = chapter - 1
+					If nextChapter < 0 Then nextChapter = 0
+					allDone = 1
+					Exit Select
+				Case &HFE:
+					nextChapter = chapter + 1
+					allDone = 1
+					Exit Select
+				Case &HFF:
+					nextChapter = &HFF
+					allDone = 1
+					Exit Select
+			End Select
+		End If
+	Loop
+	Disable INTERRUPT VBLANK
+	
+	Return nextChapter
+End Function
+
+' Nice CLS collection.
+Declare Sub niceCls(b As Integer)
+	Disable INTERRUPT VBLANK
+	SetGFXPlane SCROLL_B
+	Select Case b
+		Case 0:
+			For i = 0 To 63
+				For j = topOfScreen To 24
+					DrawTile 0, i, j + palYadjust
+				Next j
+				Sleep 1
+			Next i
+			Exit Select
+	End Select
+	scroll_pos = 0
+	scroll_pos_to = 0
+	ScrollHTo 0
+	Enable INTERRUPT VBLANK
+End Sub
+
+' Does conditional branching. Extend.
+Declare Sub doCondBranch(b As Integer, c As Integer, d As Integer, address& As Long)
+	Select Case b
+		Case &H30: 
+			If c = d Then jumpToAddress address&
+			Exit Select
+		Case &H31: 
+			If c <> d Then jumpToAddress address&
+			Exit Select
+		Case &H32: 
+			If c < d Then jumpToAddress address&
+			Exit Select
+		Case &H33: 
+			If c > d Then jumpToAddress address&
+			Exit Select
+	End Select
+End Sub
+
+' Performs a full text cycle. I'm odd
+Declare Sub doTextCycle(b As Integer)
+	clrTextArea
+	readText b
+	showLowText
+End Sub
+
+' Helper For the parser. Performs jumps
+Declare Function readAddress&() As Long
+	b = readByte ()
+	address& = b << 8
+	address& = address& + readByte ()
+	Return address&
+End Function
+
+Declare Sub jumpToAddress(address&)
+	sptP& = #PT_SPT + address&
+End Sub
+	
+' Helper For the parser. Read single bytes and advances pointer
+Declare Function readByte()
+	b = Peek(sptP&)
+	
+	' DEBUG
+	' locate 0,0:ink 1:Print sptP&; ": "; right$(hex$(b),2); "   "
+	' WaitBtn
+		
+	sptP& = sptP& + 1
+	Return b
+End Function
+
+' Helper For the parser. Read byte and interprets a possible encoded flag
+Declare Function readVByte()
+	res = 0
+	b = readByte ()
+	If b > 127 Then 
+		res = flags (b - 128)
+	Else
+		res = b
+	End If
+	Return res
+End Function
+
+' Waits until no button is pressed
+Declare Sub waitNB()
+	'button = 1
+	'While button = 1
+	'	button = 0
+	'	j = joypad()
+	'	If j.4 [OR] j.5 [OR] j.6 Then button = 1
+	'Wend
+	Do
+		j = joypad ();
+		If j = 0 Then Exit Do
+	Loop
+End Sub
+
+' Displays a flashing "press button" nice icon
+Declare Sub doWt()
+	SetGFXPlane SCROLL_A
+	finished = 0
+	flipflop = 0
+	ctFr = 0
+	' Wait For button
+	Do
+		'' 38,27
+		ctFr = ctFr + 1
+		If ctFr = 8 Then
+			ctFr = 0
+			flipflop = 1 - flipflop
+		End If
+		If flipflop = 1 Then
+			DrawTile #SYSFONTBASE + 32 + Pallette (1), 38, 27 + palYadjust
+		Else
+			DrawTile #SYSFONTBASE + 13 + Pallette (1), 38, 27 + palYadjust
+		End If
+		j = joyPad ()
+		'If j.4 [OR] j.5 [OR] j.6 Then Exit Do
+		If j.6 Then Exit Do
+		Sleep 1
+	Loop
+	' Make sure it's off
+	DrawTile #SYSFONTBASE + 32 + Pallette (1), 38, 27 + palYadjust
+	' Wait For no button
+	waitNB
+End Sub
+
+' Displays a menu with defined options (menuOpts)
+Declare Function doMenu()
+
+	' Show frame
+	SetGFXPlane SCROLL_A
+	' 21-menuOpts
+	a = menuBottom - menuOpts
+	DrawTile #SYSFONTBASE + 02 + Pallette (1), menuLeft, a + palYadjust
+	For i = menuLeft + 1 To menuLeft + 10
+		DrawTile #SYSFONTBASE + 03 + Pallette (1), i, a + palYadjust
+	Next i
+	DrawTile #SYSFONTBASE + 04 + Palette (1), menuLeft + 11, a + palYadjust 
+	Sleep 2
+	For j = a + 1 To menuBottom
+		DrawTile #SYSFONTBASE + 05 + Pallette (1), menuLeft, j + palYadjust
+		For i = menuLeft + 1 To menuLeft + 10
+			DrawTile #SYSFONTBASE + 32 + Pallette (1), i, j + palYadjust
+		Next i
+		DrawTile #SYSFONTBASE + 06 + Pallette (1), menuLeft + 11 ,j + palYadjust
+		Sleep 2
+	Next j
+	DrawTile #SYSFONTBASE + 07 + Pallette (1), menuLeft, menuBottom + 1 + palYadjust
+	For i = menuLeft + 1 To menuLeft + 10
+		DrawTile #SYSFONTBASE + 08 + Pallette (1), i, menuBottom + 1 + palYadjust
+	Next i
+	DrawTile #SYSFONTBASE + 09 + Pallette (1), menuLeft + 11, menuBottom + 1 + palYadjust
+	Sleep 2
+	
+	'' DO
+	opt = rememberMenuOpt
+	If opt > menuOpts Then opt = menuOpts
+	
+	finished = 0
+	Do While finished = 0
+		' Show
+		gpP& = #PT_MEN
+		For j = 1 To menuOpts
+			If j = opt Then 
+				add = 64
+			Else
+				add = 0
+			End If
+			For i = menuLeft + 1 To menuLeft + 10
+				tilenum = Pallette (1) + #SYSFONTBASE + Peek (gpP&) + add
+				DrawTile tilenum, i, a + j + palYadjust
+				gpP& = gpP& + 1
+			Next i
+		Next j
+		
+		' Input
+		Do
+			j = joypad ();
+			If (j.0) Then 
+				opt = opt - 1
+				If opt < 1 Then opt = menuOpts
+				Exit Do
+			End If
+			If (j.1) Then 
+				opt = opt + 1
+				If opt > menuOpts Then opt = 1
+				Exit Do
+			End If
+			'If j.5 [OR] j.6 [OR] j.7 Then 
+			If j.6 Then
+				finished = 1
+				Exit Do
+			End If
+		Loop
+		Do
+			j = joypad ();
+			If j = 0 Then Exit Do
+		Loop
+	Loop
+	''
+	
+	' Clear
+	For j = a To menuBottom + 1
+		For i = menuLeft To menuLeft + 11
+			DrawTile 0, i, j + palYadjust
+		Next i
+	Next j
+	
+	' Wait until no button is pressed
+	waitNB
+	
+	rememberMenuOpt = opt
+	Return opt
+End Function
+
+' Waits btn
+Declare Sub waitBtn()
+	Do
+		j = joypad();
+		'If j.5 [OR] j.6 [OR] j.7 Then Exit Do
+		If j.6 Then Exit Do
+	Loop
+	waitNB
+End Sub
+
+' Shows CD "loading"
+Declare Sub showLoading(isOn)
+	Ybase = 11 + palYadjust
+	SetGFXPlane SCROLL_A
+	If isOn = 0 Then
+		For i = 0 To 3
+			For j = 0 To 3
+				DrawTile 0, 18+i, Ybase+j
+			Next j
+		Next i
+		sleep 2
+	Else
+		DrawTilesInc Pallette (1) + #SYSFONTBASE + 160, 18, Ybase, 4, 4
+	End If
+End Sub
+
+' Clears lines 25, 26, 27
+Declare Sub clrTextArea()
+	SetGFXPlane SCROLL_A
+	For y = 27 - windowHeight To 27: For x = 0 To 39
+		DrawTile Pallette (1) + #SYSFONTBASE + 64, x, y + palYadjust
+	Next x: Next y
+End Sub
+
+' Shows some nice text. Word wrapping and stuff. Simple. Reads text
+' from a memory buffer To avoid stupid strings and be able To use
+' a memory pool To store stuff. Also because this way 1 char = 1 byte.
+Declare Sub showLowText()
+	gpP& = #PT_TXB
+	gpW& = #PT_CWB: cwL = 0
+	x = 1: y = 27 - windowHeight
+	dsl = 1
+	
+	SetGFXPlane SCROLL_A
+	Do
+		c = Peek (gpP&): gpP& = gpP& + 1
+		If c = 0 Then Exit Do
+		If c = 32 Then
+			If cwL > 0 Then
+				If x + cwL >= 39 Then
+					x = 1
+					y = y + 1
+				End If
+				gpW& = #PT_CWB
+				For i = 1 To cwL
+					c = Peek (gpW&)
+					gpW& = gpW& + 1
+					tnum = Pallette (1) + #SYSFONTBASE + c
+					DrawTile tnum, x, y + palYadjust
+					x = x + 1
+					If dSl Then
+						For wa = 0 To 4
+							j = joypad();
+							'If j.5 [OR] j.6 [OR] j.7 Then
+							If j.6 Then
+								dSl = 0
+								Exit For
+							End If
+							Sleep 1
+						Next wa
+					End If
+				Next i
+				x = x + 1
+				gpW& = #PT_CWB: cwL = 0
+			End If
+		Else
+			Poke gpW&, c
+			If cwL < 32 Then
+				cwL = cwL + 1
+				gpW& = gpW& + 1
+			End If
+		End If
+	Loop
+	
+	waitNB
+End Sub
+
+' Loads text from cluster and stores in buffer
+'Declare Sub readText(cluster As Integer, index As Integer)'
+'	showLoading 1
+'	' Read offset
+'	loadscd cluster, ARRAY, index * 4, gpP&
+'	loadscd cluster, ARRAY, (index + 1) * 4, gpW&
+'
+'	' Read text
+'	loadscd cluster, POINTER, gpP&, (gpW& - gpP&), #PT_TXB
+'	showLoading 0
+'End Sub
+
+' Loads text from text pool and stores in buffer
+' Why? Buffer->Buffer? Wasteful? Nope. Just thinking ahead.
+' Compression anybody? v2?
+Declare Sub readText(index As Integer)
+	textOffset& = PeekInt(#PT_TXT + (index * 2))
+	
+	tP& = #PT_TXT + textOffset&
+	tD& = #PT_TXB
+	Do
+		c = Peek(tP&)
+		tP& = tP& + 1
+		Poke tD&, c
+		tD& = tD& + 1
+		If c = 0 Then 
+			Exit Do	' So 0 is also written.
+		End If
+	Loop
+End Sub
+
+' cut = 0 full screen
+' cut = 1 load new tiles only (cut)
+' cut = 2 display preloaded tiles (cut)
+' cut = 3 bigger than screen image
+Declare Sub loadImageFromMem(index As Integer, cut As Integer, cindex As Integer, x As Integer, y As Integer, fore As Integer)
+	' Get image address = offset + #PT_IMG
+	imgOffs& = #PT_IMG + PeekLong&(#PT_IMG + (index * 4))
+	nextImgOffs& = #PT_IMG + PeekLong&(#PT_IMG + ((index + 1) * 4))
+	
+	' Read palette and set
+	p& = imgOffs&
+	For i = 0 To 15
+		col = peekInt(p&):	p& = p& + 2: palette col, 0, i
+	Next i
+	
+	' Read flag int
+	flag = peekInt(p&)
+	
+	' Reset tile counter? only If flag = 0 (full screen)
+	'If flag = 0 Then 
+	'	lastTile = 0: cutsPoolIndex = 0: cindex = 0
+	'	w = 40: h = 24
+	'Else
+	'	w = flag >> 8: h = flag % 256
+	'	' Bigger than screen image have flag != 0, so
+	'	If cut = 3 Then
+	'		lastTile = 0: cutsPoolIndex = 0: cindex = 0
+	'	End If
+	'End If
+	' Better...
+	If cut = 0 [OR] cut = 3 Then
+		lastTile = 0: cutsPoolIndex = 0: cindex = 0
+	End If
+	w = flag >> 8: If w = 0 Then w = 40
+	h = flag % 256: If h = 0 Then h = 24
+	
+	' Loading new tiles? Add To pool (To reuse later)
+	If cut != 2 Then
+		cutsPool(cindex, 0) = lastTile
+		cutsPool(cindex, 1) = index
+		
+		If flag = 0 [OR] cut = 3 Then showLoading 1
+		
+		' Read tileset
+		' Find how many words To write To VRAM.
+		nbytes& = nextImgOffs& - imgOffs& - (w*h*2 + 32 + 2)
+		nwords& = nbytes& / 2
+		ntiles = getIntPart(nbytes& / 32)
+		p& = (w*h*2 + 32 + 2) + imgOffs&
+		a& = (#IMGPOOLTSBASE + lastTile) * 32
+		b& = a& + nwords& - 2
+		For i& = a& To b& Step 2
+			VdpRamWrite i&, peekInt (p&): p& = p& + 2
+		Next i&
+		
+		If flag = 0 [OR] cut = 3 Then showLoading 0
+	End If
+	
+	' Read tilemap and show
+	If cut != 1 Then
+		If fore = 1 Then 
+			SetGfxPlane SCROLL_A 
+		Else
+			SetGfxPlane SCROLL_B
+		End If
+		p& = imgOffs& + 34
+		'If flag != 0 [OR] fancy = 0 Then
+		If fancy = 0 Then
+			DrawTiles16 p&, x, y + topOfScreen + palYadjust, w, h, #IMGPOOLTSBASE + cutsPool(cindex, 0)
+		Else
+			tileBase = #IMGPOOLTSBASE + cutsPool(cindex, 0)
+			For i = 0 To w - 1
+				For j = 0 To h - 1
+					DrawTile tileBase + PeekInt(p& + i + i + (j * (w + w))), x + i, y + j + topOfScreen + palYadjust
+				Next j
+				sleep 1
+			Next i
+		End If
+	End If
+	
+	' Update lastTile
+	If cut != 2 Then
+		lastTile = lastTile + ntiles
+	End If
+End Sub
+
+' Oh my gosh - BasiEgaXorz doesn't have any type conversion
+' that I know of - and type promotion is just lame. I have
+' To do this DIRTY trick To extract the INT part of a LONG...
+' As you can't assign a long To an integer... Which is lame.
+Declare Function getIntPart(v& As Long) As Integer
+	' Use #PT_CWB As a temporary scratchpad
+	PokeLong #PT_CWB, v&
+	' The int part is 2 bytes ahead
+	Return PeekInt(#PT_CWB + 2)
+End Function
+
+' Clears everything
+Declare Sub clearAll()
+	For i = 0 To 25
+		For j = 0 To 63
+			SetGfxPlane SCROLL_A
+			DrawTile 0, j, i
+			SetGfxPlane SCROLL_B
+			DrawTile 0, j, i
+		Next j
+	Next i
+End Sub
+
+' Loads an image from our indexed cluster.
+' Memory map:
+'Declare Sub loadImage(cluster As Integer, index As Integer)
+'	showLoading 1
+'	' Read offset
+'	loadscd cluster, ARRAY, index * 4, imgOffs&
+'	loadscd cluster, ARRAY, (index + 1) * 4, nextImgOffs&
+'	showLoading 0
+'	
+'	' Read palette
+'	showLoading 1
+'	loadscd cluster, POINTER, imgOffs&, 32, #PT_PLB
+'	showLoading 0
+'	
+'	' Read flag int
+'	showLoading 1
+'	loadscd cluster, ARRAY, imgOffs& + 32, imgFlag
+'	showLoading 0
+'	
+'	' Read tileset
+'	nbytes& = nextImgOffs& - imgOffs& - 1954
+'	ntiles& = nbytes& / 32
+'	showLoading 1
+'	loadscd cluster, VRAM, imgOffs& + 1954, ntiles&, 128
+'	showLoading 0
+'	
+'	' Read tilemap
+'	showLoading 1
+'	loadscd cluster, POINTER, imgOffs& + 34, 1920, #PT_TMB
+'	showLoading 0
+'	
+'	showLoading 1
+'	' Activate palette
+'	p& = #PT_PLB
+'	For i = 0 To 15
+'		col = peekInt (p&):	p& = p& + 2
+'		palette col, 0, i
+'	Next i
+'	
+'	' Show tilemap
+'	SetGFXPlane SCROLL_B
+'	DrawTiles16 #PT_TMB, 0, 1, 40, 24, 128
+'	
+'	showLoading 0
+'End Sub
+		
+' Code by Mairtruss
+' drawtiles16 lblptr&(<TileMap>),<X Pos>,<Y Pos>,<Width>,<Height>,<Adder>	
+Declare Asm Sub DrawTiles16(d5.l, d0.w, d1.w, d2.w, d3.w, d4.w)
+	movea.l	d5,a0
+	subq.b	#1,d2
+	subq.b	#1,d3
+	move.w	#$2700,sr
+	and.l	#63,d0
+	and.l	#63,d1
+	and.l	#511,d2
+	and.l	#511,d3
+	lsl.w	#6,d1
+	add.w	d1,d0
+	move.w	d2,d1
+	lsl.l	#3,d0
+	lsr.w	#2,d0
+	swap	d0
+	add.l	(GFX_PLANE),d0
+	move.w	#$8F02,4(a4)
+@1:
+	move.l	d0,4(a4)
+@2:
+	move.w	(a0)+,d7
+	add.w	d4,d7
+	move.w	d7,(a4)
+	dbf	d2,@2
+	add.l	#$800000,d0
+	move.w	d1,d2
+	dbf	d3,@1
+	move.w	#$2000,sr
+End Sub	
+
+' Scroll2 is broken so I wrote this
+' Scrolls SCROLL_B plane, of course.
+Declare Sub ScrollHTo(x As Integer)
+	VdpRamWrite &HA802, 512 - x
+End Sub
+
+'' SFX engine
+
+' Fetches sample #ns from #CLUSTER_SAMPLES
+' copies it into sample pool, updates everything and stuff
+Declare Sub sampleAdd(ns As Integer)
+	showLoading 1
+	
+	' Read offset from cluster
+	loadscd #CLUSTER_SAMPLES, ARRAY, ns * 4, smpOffs&
+	loadscd #CLUSTER_SAMPLES, ARRAY, (ns + 1) * 4, nextSmpOffs&
+	sSize& = nextSmpOffs& - smpOffs&
+
+	' Read sample to MCD RAM
+	' Can be done directly? If not, shit, I have to allocate some space
+	' at the end of the IMG pool then move.
+	samplePool&(sampleCur, 0) = sampleOffset&
+	loadscd #CLUSTER_SAMPLES, POINTER, smpOffs&, sSize&, sampleOffset&
+	
+	' Update pool
+	sampleOffset& = sampleOffset& + sSize&
+	' Samples are always 256 - aligned.
+	samplePool&(sampleCur, 1) = sampleOffset&
+	
+	showLoading 0
+	
+	sampleCur = sampleCur + 1
+End Sub
+
+'Declare Sub samplePlay(sFrom&, sTo&)
+'	PokeLong &HFFFFDC, sFrom&
+'	PokeLong &HFFFFE0, sTo&
+'	call PlaySample
+'End Sub
+Declare Asm Sub samplePlay(d0.l, d1.l)
+	; This routine needs SAMPLE START @ d0, SAMPLE END @ d1
+    sub.l d0,d1
+waitPlayer:
+    move.w  #$100,$a11100	;busreq on
+    lea $a01ff0,a0
+    move.b (a0),d2
+    move.w  #$0,$a11100		;busreq off
+waitEnd:
+    move.w  #$100,$a11100	;busreq on
+    lea $a01ff1,a0			;store sample parameters in main RAM
+    lsr.l #8,d0
+    move.l d0,d2
+    lsr.l #7,d2
+    move.b d2,(a0)+			;bank number
+    or.l #$80,d0
+    move.b d0,(a0)+			;bank offset (msb)
+    lsr.l #8,d1
+    move.b d1,(a0)+			;sample length (lsb)
+    lsr.l #8,d1
+    move.b d1,(a0)+			;sample length (msb)
+    lea $a01ff0,a0			;set 'new sample' flag
+    move.b #$ff,d0
+    move.b d0,(a0)+
+    move.w  #$0,$a11100		;busreq off    
+	rts
+End Sub
+
+'' EOSFX engine
+
+' Stuff to perform each VBLANK.
+' For example: scrolling.
+vBlank_controller:
+
+	' Scrolling controller
+	scroll_subctr = scroll_subctr + 1
+	If scroll_maxSubstep = 0 [OR] scroll_subctr >= scroll_maxSubstep Then
+			scroll_subctr = 0
+		If scroll_pos_to = scroll_pos Then 
+			flags(126) = scroll_pos >> 3
+		ElseIf scroll_pos_to > scroll_pos Then
+			scroll_pos = scroll_pos + scroll_step		
+			flags(126) = scroll_pos >> 3
+		Else
+			scroll_pos = scroll_pos - scroll_step
+			' Cheesy, yet works...
+			flags(126) = (scroll_pos + 7) >> 3
+		End If
+		ScrollHTo scroll_pos
+	End If		
+	
+	' Button bindings
+	j = joypad();
+	
+	' B Button
+	If j.4 Then
+		If Peek(&HFFFF2C) Then
+			Poke &HFFFFFF, Peek(&HFFFF2C)
+			vBlankIntSignal = 1
+		End If
+	End If
+	
+	' C Button
+	If j.5 Then
+		If Peek(&HFFFF2D) Then
+			Poke &HFFFFFF, Peek(&HFFFF2C)
+			vBlankIntSignal = 1
+		End If
+	End If
+	
+	' START Button
+	If j.7 Then
+		If Peek(&HFFFF2E) Then
+			Poke &HFFFFFF, Peek(&HFFFF2C)
+			vBlankIntSignal = 1
+		End If
+	End
+	
+	Return
+
+'' There's stuff by shiru in every game I make.
+
+	asm
+	
+shiruLoadZ80:		
+    move.w  #$100,$a11100		;busreq on
+    move.w  #$100,$a11200		;reset off
+
+    lea     $000000,a0
+    lea     $a00000,a1
+    move.l  #8192,d0
+copyLoop0:
+    move.b  (a0)+,(a1)+
+    subq.w  #1,d0
+    bne     copyLoop0
+    
+    lea     DriverZ80,a0 		;copy Z80 driver to Z80 RAM
+    lea     $a00000,a1
+    move.l  #DriverZ80end,d0
+    move.l  #DriverZ80,d1
+    sub.l   d1,d0
+copyLoop:
+    move.b  (a0)+,(a1)+
+    subq.w  #1,d0
+    bne     copyLoop
+
+	move.l  #SoundEmpty,d0		
+    lea     $a01ff0,a0
+    lsr.l   #8,d0
+    move.l  d0,d1
+    lsr.l   #7,d1
+    move.b  d1,(a0)+ 			;bank number
+    or.l    #$80,d0
+    move.b  d0,(a0)+			;bank offset (msb)
+
+    move.w  #$0,$a11200			;reset on
+    move.w  #$0,$a11100			;busreq off
+    move.w  #$100,$a11200		;reset off
+	rts
+
+    Align 256					;samples must be 256-byte aligned!
+
+SoundEmpty:
+    incbin "shirusfx\blank.raw"	;empty buffer for silence channels
+	
+DriverZ80:
+	align 2
+    incbin "shirusfx\driver.bin"
+    align 2
+DriverZ80end:
+
+	end asm
+	
+' Y si eso, ya.

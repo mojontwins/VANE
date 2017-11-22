@@ -1,0 +1,110 @@
+'' VANE 0.2 by The Mojon Twins & Relevo
+	option SEGACD
+	option NOLOADFONT
+
+'' Cluster configuration
+
+	' Configure the location of subprograms here.
+	' Poke a 0 to deactivate.
+	
+	Poke &HFFFF00, 2					' MENU.SCD
+	Poke &HFFFF01, 3					' VANE.SCD
+	Poke &HFFFF02, 0					' BATTLE.SCD
+	Poke &HFFFF03, 0					' GAMEOVER.SCD
+	Poke &HFFFF04, 0					' ENDING.SCD
+	
+'' Cluster loading...
+                                        ' CLUSTRER NUMBER:
+	addscd menu.scd						' 2
+	addscd vane.scd						' 3
+	' addscd battle.scd
+	' addscd gameover.scd
+	' addscd ending.scd
+	
+	addscd bin\charset-menu.bin			' 4
+	addscd bin\charset-menu-pal.bin		' 5
+	
+	addscd bin\charset-vane.bin			' 6
+	addscd bin\charset-vane-pal.bin		' 7
+	
+	addscd bin\charset-battle.bin		' 8
+	addscd bin\charset-battle-pal.bin	' 9
+	
+	addscd bin\sounds.bin				' 10
+	
+	' Espacio / tiempo begins on cluster #11
+	' 0
+	addscd bin\im00c.bin
+	addscd bin\sp00c.bin
+	' 1
+	addscd bin\im01c.bin
+	addscd bin\sp01c.bin
+	' 2
+	addscd bin\im02c.bin
+	addscd bin\sp02c.bin
+	' 3 
+	addscd bin\im03c.bin
+	addscd bin\sp02c.bin
+	' 4
+	addscd bin\im04c.bin
+	addscd bin\sp04c.bin
+	' 5
+	addscd bin\im05c.bin
+	addscd bin\sp05c.bin
+	
+	' This is a natural terminator. For debugging, so you don't have
+	' to worry about terminating the game.
+	
+	addscd bin\imen.bin
+	addscd bin\spen.bin
+	
+	' Espacio / tiempo ecchi begins on cluster #
+	' 0
+	addscd bin\im00.bin
+	addscd bin\sp00.bin
+	' 1
+	addscd bin\im01.bin
+	addscd bin\sp01.bin
+	' 2
+	addscd bin\im02.bin
+	addscd bin\sp02.bin
+	' 3 
+	addscd bin\im03.bin
+	addscd bin\sp03.bin
+	' 4
+	addscd bin\im04.bin
+	addscd bin\sp04.bin
+	' 5
+	addscd bin\im05.bin
+	addscd bin\sp05.bin
+	
+	' This is a natural terminator. For debugging, so you don't have
+	' to worry about terminating the game.
+		
+	addscd bin\imen.bin
+	addscd bin\spen.bin
+	
+	''
+	
+	'' Initialization
+
+	' PAL/NTSC code
+	If TvType() = 0 Then
+		' NTSC
+		TvSet 0
+		Ctr = 120
+	Else
+		' PAL
+		TvSet 1
+		Ctr = 100
+	End If
+	
+	'' Jump to menu if menu exists, otherwise jump to VANE
+	'' with first chapter (default)
+	If Peek(&HFFFF00) <> 0 Then
+		loadscd Peek(&HFFFF00)
+	Else
+		Poke &HFFFF20, 0
+		loadscd Peek(&HFFFF01)
+	End If
+	

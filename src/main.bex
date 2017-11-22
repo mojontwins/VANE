@@ -1,0 +1,53 @@
+'' VANE 0.2 by The Mojon Twins & Relevo
+	option SEGACD
+	option NOLOADFONT
+
+'' Cluster configuration
+
+	' Configure the location of subprograms here.
+	' Poke a 0 to deactivate.
+	
+	Poke &HFFFF00, 2					' MENU.SCD
+	Poke &HFFFF01, 3					' VANE.SCD
+	Poke &HFFFF02, 0					' BATTLE.SCD
+	Poke &HFFFF03, 0					' GAMEOVER.SCD
+	Poke &HFFFF04, 0					' ENDING.SCD
+	
+'' Cluster loading...
+
+	' Main subprograms
+
+	addscd menu.scd						' 2
+	addscd vane.scd						' 3
+	
+	' General assets
+
+	addscd bin\charset-menu.bin			' 4
+	addscd bin\charset-menu-pal.bin		' 5
+	
+	addscd bin\charset-vane.bin			' 6
+	addscd bin\charset-vane-pal.bin		' 7
+	
+	addscd bin\sounds.bin				' 8
+	
+	' The game
+	
+	' Chapter 0
+	addscd bin\im00c.bin 				' 9
+	addscd bin\sp00c.bin 				' 10
+
+	' Chapter 1
+	addscd bin\im01c.bin 				' 11
+	addscd bin\sp01c.bin 				' 12
+	
+	''
+	
+	'' Jump to menu if menu exists, otherwise jump to VANE
+	'' with first chapter (default)
+	If Peek(&HFFFF00) <> 0 Then
+		loadscd Peek(&HFFFF00)
+	Else
+		Poke &HFFFF20, 0
+		loadscd Peek(&HFFFF01)
+	End If
+	

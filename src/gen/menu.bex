@@ -1,0 +1,168 @@
+'' VANE 0.2 by The Mojon Twins & Relevo
+	option SEGACD PROGRAM
+	option NOLOADFONT
+	
+'' Use this module for your nice, custom menu.
+
+'' Menu code for Espacio / Tiempo
+'' (Not really a menu - yet)
+
+	If TvType() = 0 Then
+		' NTSC
+		Ctr = 120
+	Else
+		' PAL
+		Ctr = 100
+	End If
+	
+	' Constants
+	Const #CLUSTER_CHARSET = 4
+	Const #CLUSTER_CHARSET_PAL = 5
+	Const #SYSFONTBASE = 0
+	Const #DUMMYBUFFER = &H230000			' Temporal buffer.
+	
+	' Change constantly during development :-/
+	' Total number of chapters.
+	Const #MAXCHAP = 6
+	
+	' Set up font & font palette
+	loadscd #CLUSTER_CHARSET, VRAM, 0, 192, #SYSFONTBASE
+	loadscd #CLUSTER_CHARSET_PAL, POINTER, 0, 32, #DUMMYBUFFER
+	For i = 0 To 15
+		Palette PeekInt(#DUMMYBUFFER + i + i), 0, i
+	Next i
+	
+	' Show text (and wait for user input to unblock secret stuff
+	locate 11, 10: Print "(^) LSAN PRODUKTIONS"
+	locate 12, 10: Print "(^) THE MOJON TWINS"
+	locate 14, 14: Print "LOADING..."
+	
+	' Codes are:
+	' UP DOWN LEFT RIGHT START -- Ecchi
+	' A+B+C -- Select chapter (for debugging, remove later!)
+	State = 0
+	Ecchi = 0
+	chapter = 0
+	While Ctr > 0
+		Sleep 1
+		j = joypad()
+		If j.0 Then
+			If State = 0 Then
+				State = 1
+			Else 
+				State = 0
+			End If
+			waitDepress 0
+		End If
+		If j.1 Then
+			If State = 1 Then
+				State = 2
+			Else 
+				State = 0
+			End If
+			waitDepress 1
+		End If
+		If j.2 Then
+			If State = 2 Then
+				State = 3
+			Else 
+				State = 0
+			End If
+			waitDepress 2
+		End If
+		If j.3 Then
+			If State = 3 Then
+				State = 4
+			Else 
+				State = 0
+			End If
+			waitDepress 3
+		End If
+		If j.7 Then
+			If State = 4 Then
+				State = 5
+				Ecchi = 1
+				Locate 16, 17: Print "ECCHI!"
+				Ctr = 120
+			Else 
+				Ctr = 1
+			End If
+			waitDepress 7
+		End If
+		If j.4 [AND] j.5 [AND] j.6 Then
+			chapter = selectChapter ()
+		End If
+		Ctr = Ctr - 1
+	Wend
+	
+	'' In my game, ecchi modifies chapter:
+	If Ecchi Then chapter = chapter + #MAXCHAP + 1
+	
+	'' And now fire up VANE with the correct chapter #.
+	Poke &HFFFF20, chapter		' Next chapter to load by VANE.SCD
+	Poke &HFFFF21, Ecchi		' Gets copied to flag #127
+	Poke &HFFFF23, 0			' Run chapter from the beginning.
+	Poke &HFFFF26, 0			' Language modifier.
+	Poke &HFFFF27, 1			' Top of the screen
+	Poke &HFFFF28, 1			' Show title bar (chars at $FFFEE7-FFFEFF)
+	Poke &HFFFF29, 3			' Text window height
+	Poke &HFFFF2A, 21			' Menu Bottom
+	Poke &HFFFF2B, 28			' Menu Left
+	
+	'' Poke title bar from &HFFFEE7 to &HFFFEFF
+	Reload titlebar_text
+	For idx&=&HFFFEE7 To &HFFFEFF
+		Read c:	Poke idx&, c
+	Next idx&
+	
+	' Show CD
+	DrawTilesInc 96, 18, 6, 4, 4
+	
+	' Load VANE.SCD
+	loadscd Peek(&HFFFF01)
+
+'' Some subroutines...
+		
+Declare Sub waitDepress(bit As Integer)
+	Do
+		j = joypad()
+	Loop While j.bit <> 0
+End Sub
+	
+Declare Function selectChapter() As Integer
+	chap = 0
+	locate 16, 13: Print "SELECT CHAPTER"
+	Do
+		j = joypad()
+	Loop While j <> 0
+	Do
+		If chap < 10 Then 
+			locate 17, 19: Print "0"; chap
+		Else
+			locate 17, 19: Print chap
+		End If
+		locate 17, 19: Print ch$
+		
+		j = joypad()
+		If j.1 Then
+			If chap > 0 Then chap = chap - 1
+			waitDepress 1
+		End If
+		If j.0 Then
+			If chap < #MAXCHAP Then chap = chap + 1
+			waitDepress 0
+		End If
+		If j.4 [OR] j.5 [OR] j.6 [OR] j.7 Then
+			Exit Do
+		End If
+		
+		Sleep 1
+	Loop
+	locate 16, 13: Print "              "
+	locate 17, 19: Print "  "
+	
+	return chap
+End Function
+
+titlebar_text:
+	Data 69, 83, 80, 65, 67, 73, 79,  32, 45,  32, 84, 73, 69, 77, 80, 79,  32, 66, 89,  32, 76, 83, 95, 65, 80

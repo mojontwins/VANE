@@ -1,0 +1,5 @@
+Im not much for writing instructions.
+
+extract all files into a folder called "sfx" within the basicgaxorz directory.
+
+move shiru.bex into the main basicgaxorz folder and compile :) 

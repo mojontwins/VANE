@@ -1,0 +1,20 @@
+'----------------------------------------
+' SHIRU 4 CHANNEL SFX DRIVER
+'----------------------------------------
+
+	call LOADZ80		' LOAD Z80 DRIVER AND INITIALIZE
+	
+	PRINT "SHIRU 4 CHANNEL SOUND ENGINE BEX DEMO"
+	PRINT "-------------------------------------"
+	
+MAIN:
+	while 1
+	CALL Play_Sample2	' CALL ASM ROUTINE TO PLAY SAMPLE FROM Z80DRIVER.ASM
+	sleep rnd(100)		' PLAY SAMPLE AT FAIRLY RANDOM TIME
+	wend				' FOREVER...
+
+'----------------------------------------
+' Include ASM routines and driver and sfx 
+'----------------------------------------
+
+ 	incasm sfx\Z80DRIVER.ASM

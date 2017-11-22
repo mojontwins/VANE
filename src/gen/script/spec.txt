@@ -1,0 +1,232 @@
+Especificaciones misceláneas para el lenguaje, el compilador, el intérprete...
+
+- Se asume un espacio de direcciones de 64K. Los saltos irán especificados por una dirección de destino de 16 bits. Recuerda: big endian.
+- Los textos se añaden a un pool de textos en su propio cluster y se referencian con un ID correspondiente. Esto debe hacerlo el compilador de forma automática.
+- La estructura en clusters será fija. Para simplificar, cada "capítulo" estará formado por tres clusters, de forma que el capítulo I esté en los clusters BASE+I*3, BASE+I*3+1 y BASE+I*3+2. Los tres clusters son:
+
+	- 0 -> script
+	- 1 -> text pool
+	- 2 -> image pool
+	
+	Los números de los clusters se calculan en runtime y tal por el intérprete.
+	
+- Los menús admiten un máximo de 8 opciones y son dinámicos. Hay una orden para borrar el menú y otra para añadir items. Los textos de los items son cortos y creo que se pueden almacenar de forma estática. Ponemos 10 caracteres máximo, por ejemplo.
+	
+- Hay 128 flags, de 0 a 127. La opción seleccionada en el menú siempre va al flag #0. Internamente, los valores numéricos enteros pueden llegar de 0 a 127 también. A significa el valor A, A+128 significa el contenido del flag A.
+
+Por ahora los comandos y sus opcodes son:
+
+- IMAGE N
+	Muestra la imagen #N
+	0x01 N
+	
+- CUT_LOAD N, M
+	Carga la imagne #M en el cut #N
+	0x02 N M
+	
+- CLEAR
+	Borra la pantalla y reinicia el contador de tiles
+	0x03
+	
+- CUT_SHOW N, X, Y
+	Muestra el cut N en X, Y
+	0x04 N X Y
+	
+- FANCY ON
+	Efectito de wipe al mostrar imagenes 
+	0x05
+	
+- FANCY OFF
+	Apagar
+	0x06
+	
+- SCROLL_BG N
+	Pone de fondo de scroll la imagen de 64 tiles de ancho (max) 'N'
+	Reinicia el contador de tiles.
+	0x07 N
+	
+- RESTORE_BG
+	Vuelve a mostrar el fondo almacenado (con SCROLL_BG o IMAGE)
+	0x08
+
+- CUT_OVL N, X, Y
+	Muestra el cut N en X, Y, pero en SCROLL_A. ¡Usar con cuidado!
+	0x09 N X Y
+		
+- TEXT N [,WT]
+	Muestra el texto #N
+	0x10 N
+	0x11 N (WT)
+	
+- CLEAR_MENU
+	Borra las opciones del menu
+	0x20
+
+- ADD_ITEM "XXXXXXXXXX"
+	Añade una opción al menú
+	0x21 $ $ $ $ $ $ $ $ $ $
+	
+- ADD_ITEM "XXXXXXXXXX", N
+	Añade esta opción al menú en la casilla "N"
+	0x22 N $ $ $ $ $ $ $ $ $ $
+	
+- ADD_ITEM "XXXXXXXXXX" -> F
+	Añade una opción el menú, y almacena en qué casilla se puso en el flag F
+	0x23 F $ $ $ $ $ $ $ $ $ $
+	
+- IF A = B ADDRESS
+	Salta a ADDRESS si A = B.
+	0x30 A B A_MSB A_LSB
+	
+- IF A <> B ADDRESS
+	Salta a ADDRESS si A <> B
+	0x31 A B A_MSB A_LSB
+	
+- IF A < B ADDRESS
+	Salta a ADDRESS si A < B
+	0x32 A B A_MSB A_LSB
+
+- IF A > B ADDRESS
+	Salta a ADDRESS si A > B
+	0x33 A B A_MSB A_LSB
+
+- GOTO ADDRESS
+	Salta a address.
+	0x3F A_MSB A_LSB
+	
+- LET A = B
+	Asigna B a A
+	0x40 A B
+	
+- DO_MENU
+	Muestra el menú y asigna el resultado a 0
+	0x50
+	
+- TALK "NAME"|OFF
+	Muestra u oculta el indicador de quién habla
+	0x60 $ $ $ $ $ $ $ $ $ $ -> ON
+	0x61					 -> OFF
+	
+- CDPLAY n
+	Toca el track "n" de forma loop
+	0x70
+	
+- CLR
+	Hace un cls. El parámetro que viene luego lo dejo reservado para el futuro. Por ahora, 0
+	0x80 0
+
+- SCROLL_SET p
+	Pone el scroll en la coordenada p (chars)
+	0x88 p
+	
+- SCROLL_TO x, v
+	Scrollea hasta x (chars), v pixels cada frame
+	0x89 x
+	
+- AUTO_BRANCH PREFIX M
+	Crea un bloque de ifs automáticos que saltan a PREFIX_N con N de 1 a M
+	
+- INC n
+	Incrementa el contenido del flag n
+	0x90 n
+	
+- DEC n
+	Decrementa el contenido del flag n
+	0x91 n
+	
+- CLEAR_SAMPLES
+	Borra el pool de samples.
+	0xA0
+	
+- ADD_SAMPLE idx
+	Carga el sample idx del cluster de samples en el pool de samples (añade)
+	0xA1 idx
+	
+- PLAY_SAMPLE n
+	Toca el sample n del pool de samples (n desde 0 según orden de carga)
+	0xA2 idx
+	
+- SET n = a
+	Establece el valor a en $FFFF00+n
+	0xE0 N A
+	
+- RUN_SLOT n
+	Copia la dirección actual a $FFFF25-26
+	Ejecuta el programa en el slot N
+	0xE1 N
+	
+- BATTLE c, b
+	Ejecuta BATTLE.SCD con c como cluster de datos, y b con el capítulo al que hay que volver
+	Si se pone THIS en lugar de un número de capítulo, regresa al script actual en el mismo punto
+	de ejecución
+	
+	Equivale a la secuencia
+	SET &H20, b
+	SET &H22, c
+	SET &H23, 0
+	RUN_SLOT 2
+	
+	O bien
+	SET &H23, 1
+	RUN_SLOT 2
+
+- GAMEOVER n
+	SET &H23, n
+	RUN_SLOT 3
+
+- ENDING n
+	SET &H23, n
+	RUN_SLOT 4
+	
+---
+
+Flujo entre scripts:
+
+0xFE next
+0xFD previous
+0xFC repeat
+0xFB N jump to
+	
+Por ahora puedo empezar con esto, que me da lo básico. Nunca he hecho un compilador en dos pasadas. Esto va a ser divertido :)
+		
+Ideas. Marco con [*] lo que voy añadiendo y lo cambio de sitio
+==============================================================
+
+- Imagenes más pequeñas cargadas en x,y [*]
+
+	Por ahora tengo organizado el tileset para que haya espacio al final. Cada vez que se "cargue" una imagen del pool, los tiles se añadirán tras el último definido. IMAGE, que carga la imagen de fondo (flag 0) siempre reinicia esta cuenta de tiles.
+	
+	Las imagenes pequeñas se guardan en el pool exactamente igual pero se usa el flag para indicar que son "cuts". Se muestran así:
+	
+	CUT N, X, Y
+	
+	Un "cut" modifica un tanto el formato. No sé si será buena idea - el flag son dos bytes
+	que tengo ahí muertos de risa donde podría codificar sin problemas altura y anchura. Como no tiene sentido que altura y anchura sean 0, puedo seguir indicando con el flag 0 que es una imagen a pantalla completa.
+	
+	El conversor makecluster.bas (renombrar!) detectará si una imagen no es de 320x192 para convertirla en un CUT.
+	
+	Además, añadiré un CLEAR que borre la pantalla y resetée la cuenta, por si alguien quiere componer una imagen usando solo CUT.
+	
+	
+	
+MAS TODOS (20150405)
+
+- Poner el scroller en el interrupt vblank.
+- La posición del scroller (en chars) siempre se copia en el flag 126.
+- Atención al redondeo: si ->, hacia abajo. Si <-, hacia arriba. IMPORTANTE.
+- Cambiar compilador para usar coordenadas de tile en el scroller.
+
+DONE
+
+MAS TODOS (20150407)
+
+Implementar sistema de samples con el player de Shiru.
+Los samples se cargan en un pool en la RAM de la Megadrive.
+Están todos en un cluster especial del CD, indexados. En el script
+se cargan en RAM los que se necesiten y ya estarán disponibles.
+
+ADD_SAMPLE s, donde "s" es el # dentro del cluster. Lo añade desde "0" en el pool en RAM
+CLEAR_SAMPLES, borra el pool.
+PLAY_SAMPLE i, toca el sample "i" del pool, i desde 0 según el orden de carga.
+
+Aparte necesitaré un script sencillo para crear el cluster con el índice.
