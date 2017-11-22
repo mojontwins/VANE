@@ -3,6 +3,8 @@ VANE - Visual Adventure Novel Engine
 
 VANE is a Visual Novel engine for SEGA Mega CD (we have in mind porting it to other weird systems such as PC XT/CGA, for example). It's based upon several subprograms which are chained together to create a game. There's one module missing: a Snatcher style battle engine which I never finished.
 
+VANE was created in 2015 as a vehicle to create remakes of some old visual novels for MSDOS made by na_th_an circa 1994-1995. In mid 2015, Jon Cortazar from Rel3vo helped us with planning and design, making the engine much more flexible and powerful.
+
 You will need BasiEgaXorz. Go get it from http://devster.monkeeh.com/sega/basiegaxorz/ . Read some docs and get a hello world program running from a cart in your emulator before even attempting to read this doc.
 
 Also, you should learn a bit about how Mega CD works. There's a data track on the CD, which is divided in "clusters". Clusters are numbered chunks of data within the data track which can be individually loaded by the Mega CD. We'll be talking about clusters *a lot*, so be sure you understand the basics.
@@ -32,7 +34,7 @@ main.bex
 
 BEX is a tad strange. The implementation of Mega CD support is a bit sketchy, but it gets the job done. Basicly, you have a main subprogram which BEX will stuff in cluster 1. BEX runtime itself is stored at cluster 0. When you run the CD, BEX runtime will jump to cluster 1 after initializing some stuff.
 
-This main subprogram is a bit special - besides actual code, it contains compiler directives which instruct BEX which additional clusters it should add to the data track in the CD. This is performed via `addscd` commands. 
+This main subprogram is a bit special - besides actual code, it contains compiler directives which instruct BEX about which additional clusters it should add to the data track in the CD. This is performed via `addscd` commands. 
 
 In VANE, `main.bex` is used to load binaries and programs into clusters, configure the program slots and other options, and then run the menu slot or the engine slot.
 
@@ -250,7 +252,7 @@ This makes chapter 0 = cluster 9 (and 10) and chapter 1 = cluster 11 (and 12). C
 Constants
 ---------
 
-There are several sets of constants. You should tinker with most, but those are useful:
+There are several sets of constants. You shouldn't tinker with most, but those are useful:
 
 ```
     Const #CLUSTER_CHARSET = 6
@@ -325,6 +327,16 @@ Charset and charset palette
 
 You should use the included charsets as a basis to design yours. Then you can convert them with Imagenesis and export the pattern data as palette binaries. Get Imagenesis from http://devster.monkeeh.com/sega/imagenesis/
 
+Sound cluster
+=============
+
+TODO
+
+Adding additional subprograms
+=============================
+
+TODO
+
 Legal shit
 ==========
 
@@ -335,4 +347,5 @@ I don't know what to do
 
 I know the feeling, that's why I have writen a small doc on how I built the demo project, step by step. Check `tutorial.md`
 
-Copyleft 2015 by The Mojon Twins
+Copyleft 2015 by The Mojon Twins.
+Special thanks to Jon Cortazar from Rel3vo for helping making VANE "not crap".
