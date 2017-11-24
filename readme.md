@@ -3,7 +3,7 @@ VANE - Visual Adventure Novel Engine
 
 VANE is a Visual Novel engine for SEGA Mega CD (we have in mind porting it to other weird systems such as PC XT/CGA, for example). It's based upon several subprograms which are chained together to create a game. There's one module missing: a Snatcher style battle engine which I never finished.
 
-VANE was created in 2015 as a vehicle to create remakes of some old visual novels for MSDOS made by na_th_an circa 1994-1995. In mid 2015, Jon Cortazar from Rel3vo helped us with planning and design, making the engine much more flexible and powerful.
+VANE was created in 2015 as a vehicle to create remakes of some old visual novels for MSDOS made by na_th_an circa 1994-1995. In mid 2015, Jon Cortazar from Relevo helped us with planning and design, making the engine much more flexible and powerful.
 
 You will need BasiEgaXorz. Go get it from http://devster.monkeeh.com/sega/basiegaxorz/ . Read some docs and get a hello world program running from a cart in your emulator before even attempting to read this doc.
 
@@ -348,4 +348,4 @@ I don't know what to do
 I know the feeling, that's why I have writen a small doc on how I built the demo project, step by step. Check `tutorial.md`
 
 Copyleft 2015 by The Mojon Twins.
-Special thanks to Jon Cortazar from Rel3vo for helping making VANE "not crap".
+Special thanks to Jon Cortazar from Relevo for helping making VANE "not crap".
